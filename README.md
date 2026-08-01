@@ -10,28 +10,28 @@
 | --- | --- |
 | 프론트엔드 | Next.js (App Router) + TypeScript |
 | 백엔드 | Next.js API Routes |
-| 데이터베이스 | SQLite (Prisma ORM, `@prisma/adapter-better-sqlite3`) |
+| 데이터베이스 | PostgreSQL — Prisma Postgres (Prisma ORM, `@prisma/adapter-pg`) |
 | 스타일링 | TailwindCSS (반응형) |
 | 인증 | 이메일+비밀번호(bcryptjs) + 서명된 세션 JWT(jose) |
 | 엑셀 내보내기 | exceljs |
 | 테스트 | Vitest |
 
 프론트엔드와 백엔드를 하나의 Next.js 프로젝트로 통합해, 초기 개발 속도를 높이는 구성입니다.
-DB는 SQLite로 시작하며, 추후 PostgreSQL로 전환 시 Prisma 스키마의 `datasource` provider와
-드라이버 어댑터만 교체하면 됩니다(아래 "배포 가이드" 참고).
+개발·테스트·운영 모두 Postgres를 사용하며(개발/운영용 `DATABASE_URL`과 테스트 전용
+`TEST_DATABASE_URL`을 분리해서 씀), 다른 Postgres 제공자(Neon, Supabase, Vercel Postgres
+등)로 옮기려면 `.env`의 연결 문자열만 교체하면 됩니다(아래 "배포 가이드" 참고).
 
 ## 폴더 구조
 
 ```
 training_schedule/
 ├── prisma/
-│   ├── schema.prisma        # Instructor / User / Schedule / ScheduleDeleteLog / Notification 모델
+│   ├── schema.prisma        # Instructor / User / Schedule / ScheduleDeleteLog / Notification 등 모델
 │   ├── seed.ts               # 시드 데이터 스크립트 (계정 포함)
-│   ├── test.db                # 테스트 전용 SQLite (git 미포함, vitest globalSetup이 생성)
-│   └── migrations/           # 마이그레이션 이력
+│   └── migrations/           # 마이그레이션 이력 (Postgres SQL)
 ├── prisma.config.ts          # Prisma CLI 설정 (DB 위치, 시드 커맨드)
 ├── vitest.config.ts          # 테스트 러너 설정 (파일 병렬 실행 끔 — 테스트 DB 공유)
-├── .env                       # DATABASE_URL, AUTH_SECRET (git 미포함)
+├── .env                       # DATABASE_URL, TEST_DATABASE_URL, AUTH_SECRET (git 미포함)
 ├── .env.example               # 배포/신규 개발 환경용 템플릿
 ├── tests/
 │   ├── global-setup.ts        # 테스트 DB 마이그레이션 (전체 1회 실행)
@@ -84,7 +84,7 @@ training_schedule/
 │   │   ├── page.tsx                   # 랜딩 페이지 (로그인 세션에 따라 내용 분기)
 │   │   └── layout.tsx
 │   ├── lib/
-│   │   ├── prisma.ts             # Prisma Client 싱글턴 (better-sqlite3 어댑터)
+│   │   ├── prisma.ts             # Prisma Client 싱글턴 (pg 드라이버 어댑터)
 │   │   ├── access-control.ts     # 개인일정 필드 접근 제어(마스킹) 로직 + PERSONAL_TITLE_PLACEHOLDER
 │   │   ├── schedule-actor.ts     # 스케줄 등록/수정/삭제 행위자 판정(본인 강사 vs 팀장/매니저 전체 권한)
 │   │   ├── schedule-labels.ts    # 시간대/일정유형 라벨 (여러 화면이 공유하는 단일 출처)
@@ -99,7 +99,6 @@ training_schedule/
 │   │   ├── schedule-input.ts     # 스케줄 등록/수정 입력값 검증·정규화
 │   │   └── schedule-overlap.ts   # 본인 일정 시간 겹침 조회
 │   └── generated/prisma/         # Prisma가 생성한 클라이언트 코드 (git 미포함)
-├── dev.db                    # SQLite 데이터베이스 파일 (git 미포함)
 └── README.md
 ```
 
@@ -271,8 +270,8 @@ GET /api/schedules?from=2026-07-01&to=2026-08-01&instructor=3
 - 인증에 성공하면 `{ userId, email, role, instructorId }`를 담은 세션을 **서명된
   JWT**(`jose`, HS256, `AUTH_SECRET` 서명키)로 발급해 `session`이라는 httpOnly 쿠키에
   저장합니다(만료 12시간, `src/lib/auth/session.ts`). 세션은 DB에 저장하지 않는
-  stateless 토큰이므로, 라우트 가드가 실행되는 Edge 런타임(Prisma의 better-sqlite3
-  어댑터를 쓸 수 없는 환경)에서도 DB 조회 없이 서명만으로 검증할 수 있습니다.
+  stateless 토큰이므로, 라우트 가드가 실행되는 Edge 런타임(Prisma의 pg 드라이버 어댑터를
+  쓸 수 없는 환경)에서도 DB 조회 없이 서명만으로 검증할 수 있습니다.
 - 강사 계정은 로그인 후 `/my-schedule`로, 팀장/매니저 계정은 `/calendar`로 리다이렉트됩니다.
 - 로그아웃은 세션 쿠키 삭제로 처리됩니다(만료 전 강제 무효화는 지원하지 않음 — 그래서
   세션 만료 시간을 짧게 유지합니다).
@@ -318,6 +317,8 @@ GET /api/schedules?from=2026-07-01&to=2026-08-01&instructor=3
 | `haeun@example.com` | 강사(INSTRUCTOR) | 정하은 (C팀) |
 | `teamlead@example.com` | 팀장(TEAM_LEAD) | 스케줄 미소유 |
 | `manager@example.com` | 매니저(MANAGER) | 스케줄 미소유 |
+| `general@example.com` | 일반 사용자(GENERAL) | 승인됨 — 바로 로그인 가능 |
+| `pending@example.com` | 일반 사용자(GENERAL) | 승인 대기 — 로그인 시 거부되어야 정상 |
 
 ### 역할별 테스트 시나리오
 
@@ -372,21 +373,23 @@ GET /api/schedules/export?from=2026-07-01&to=2026-08-01&instructor=ALL
 npm test
 ```
 
-Vitest로 3개 영역을 검증합니다(총 27개 테스트, `tests/api/`):
+Vitest로 5개 영역을 검증합니다(총 51개 테스트, `tests/api/`):
 
 | 파일 | 검증 내용 |
 | --- | --- |
-| `my-schedules.test.ts` | 등록(성공/검증 실패/겹침 409/강제 저장), 조회(본인 것만), 수정·삭제(소유자만 가능, 타인 403), 삭제 로그 기록, **팀장/매니저가 `instructorId` 지정으로 임의 강사 앞 등록·수정·삭제 가능**(400/404 검증 포함), 삭제 로그의 `deletedByUserId`가 실제 행위자(강사 본인 또는 팀장/매니저)와 일치 |
+| `my-schedules.test.ts` | 등록(성공/검증 실패/겹침 409/강제 저장), 조회(본인 것만), 수정·삭제(소유자만 가능, 타인 403), 삭제 로그 기록, 팀장/매니저가 `instructorId` 지정으로 임의 강사 앞 등록·수정·삭제 가능(400/404 검증 포함), 삭제 로그의 `deletedByUserId`가 실제 행위자와 일치 |
 | `schedules-calendar.test.ts` | `from`/`to` 필수 검증, 날짜 범위 필터링, `instructor=ALL`(전체 강사) vs `instructor=<id>`(단일 강사) 필터 |
-| `personal-reason-masking.test.ts` | **팀장/매니저 조회·엑셀 다운로드 시 개인일정 `title`/`memo`가 실값 그대로 노출**, 다른 강사 조회 시에는 여전히 플레이스홀더로 마스킹, 본인 조회 시에만 실값 노출, 쿼리 파라미터 조작으로 역할 사칭 불가 |
+| `personal-reason-masking.test.ts` | 팀장/매니저 조회·엑셀 다운로드 시 개인일정 `title`/`memo`가 실값 그대로 노출, 다른 강사 조회 시에는 여전히 플레이스홀더로 마스킹, 본인 조회 시에만 실값 노출, 쿼리 파라미터 조작으로 역할 사칭 불가 |
+| `lecture-requests.test.ts` | 강의 신청 생성(권한/유형 자격/시간대 범위/슬롯 충돌 검증), `scope=mine`/`scope=pending` 조회 범위, 확정·거절 권한(대상 강사 본인 또는 팀장/매니저), 거절 시 점유 스케줄 삭제로 슬롯 재오픈 |
+| `general-access.test.ts` | 회원가입(중복 이메일/비밀번호 불일치 거부), `PENDING` 계정 로그인 차단, 일반 사용자의 `/api/my/schedules` 직접 호출 차단, 강의 유형/강사 Pool 관리 권한(팀장/매니저 전용), 가입 승인 관리 권한, 블록 단위(시간 미입력) 개인일정 등록·겹침 규칙 |
 
-테스트는 개발용 `dev.db`와 별도인 `prisma/test.db`를 사용합니다(첫 실행 시
-`vitest.config.ts`의 `globalSetup`이 자동으로 마이그레이션을 적용합니다). 모든 테스트
-파일이 같은 SQLite 파일을 공유하므로 `fileParallelism: false`로 순차 실행되도록
-설정했습니다 — 그렇지 않으면 파일 간 `beforeEach`의 시드 초기화가 서로 경합합니다.
-라우트 핸들러는 `getSessionFromRequest(request)`로 세션을 읽도록 작성되어 있어(암묵적
-`next/headers` 컨텍스트에 의존하지 않음), 테스트에서 직접 만든 `NextRequest`에 세션
-쿠키를 실어 호출할 수 있습니다.
+테스트는 개발/운영용 `DATABASE_URL`과 분리된 `TEST_DATABASE_URL`(전용 Postgres DB)을
+사용합니다(첫 실행 시 `vitest.config.ts`의 `globalSetup`이 자동으로 마이그레이션을
+적용합니다). 모든 테스트 파일이 같은 DB를 공유하므로 `fileParallelism: false`로 순차
+실행되도록 설정했습니다 — 그렇지 않으면 파일 간 `beforeEach`의 시드 초기화가 서로
+경합합니다. 라우트 핸들러는 `getSessionFromRequest(request)`로 세션을 읽도록 작성되어
+있어(암묵적 `next/headers` 컨텍스트에 의존하지 않음), 테스트에서 직접 만든 `NextRequest`에
+세션 쿠키를 실어 호출할 수 있습니다.
 
 ### 반응형 디자인
 
@@ -401,45 +404,48 @@ Vitest로 3개 영역을 검증합니다(총 27개 테스트, `tests/api/`):
 - 일정 상세 사이드 패널은 모바일 폭에서는 화면 전체를, 데스크톱에서는 `max-w-sm`만
   차지합니다.
 
-### 배포 가이드
+### 배포 가이드 (Vercel + Prisma Postgres)
 
-1. **환경 변수**: `.env.example`을 `.env`로 복사하고 값을 채웁니다.
+이 프로젝트는 Postgres 기반이라 별도 DB 전환 작업 없이 서버리스 플랫폼(Vercel 등)에
+바로 배포할 수 있습니다. Prisma Postgres가 아닌 다른 Postgres 제공자(Neon, Supabase,
+Vercel Postgres 등)를 쓰고 싶다면 3번의 `DATABASE_URL`만 해당 제공자의 연결 문자열로
+바꾸면 되고, 나머지 절차는 동일합니다.
+
+1. **GitHub에 푸시**: 아직 원격 저장소가 없다면 GitHub에 새 저장소를 만들고 푸시합니다.
    ```bash
-   cp .env.example .env
-   ```
-   - `AUTH_SECRET`은 반드시 새로 생성하세요: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-   - `DATABASE_URL`은 배포 환경에 맞게 설정합니다(아래 참고).
-
-2. **데이터베이스 선택 — SQLite로 유지할지 여부를 먼저 정하세요**:
-   - **서버리스/멀티 인스턴스 배포(Vercel 등)**: 파일 기반 SQLite는 인스턴스마다 별도
-     파일시스템을 쓰거나 재배포 시 초기화될 수 있어 **적합하지 않습니다**. PostgreSQL
-     (Vercel Postgres, Supabase, Neon 등) 같은 관리형 DB로 전환해야 합니다 —
-     `prisma/schema.prisma`의 `datasource db { provider = "sqlite" }`를
-     `provider = "postgresql"`로 바꾸고, `src/lib/prisma.ts`의
-     `@prisma/adapter-better-sqlite3` 어댑터를 `@prisma/adapter-pg`(또는 사용하는 DB의
-     공식 어댑터)로 교체합니다. 나머지 코드(Prisma 쿼리, 마스킹 로직, API)는 변경할
-     필요가 없습니다.
-   - **단일 서버/컨테이너에 영구 디스크가 있는 배포(VM, Docker + 볼륨 등)**: SQLite
-     파일(`dev.db`)을 그대로 유지해도 됩니다. 단, 배포 프로세스가 재시작되어도 같은
-     디스크 경로를 계속 쓰도록(볼륨 마운트) 구성하세요.
-
-3. **빌드 및 마이그레이션**:
-   ```bash
-   npm ci
-   npx prisma migrate deploy   # 운영 DB에 마이그레이션 적용 (migrate dev 아님)
-   npm run db:seed             # 최초 1회만 — 이미 데이터가 있다면 생략
-   npm run build
-   npm run start                # 또는 사용 중인 Node 프로세스 매니저(pm2 등)로 실행
+   git remote add origin <저장소 URL>
+   git push -u origin main
    ```
 
-4. **운영 체크리스트**:
-   - `AUTH_SECRET`을 개발용 값과 다르게 설정했는지 확인
-   - `NODE_ENV=production`이면 세션 쿠키에 `Secure` 속성이 자동으로 붙습니다
-     (`src/app/login/actions.ts`)
-   - 시드 스크립트의 데모 계정(`password123`)은 운영 배포 전 반드시 삭제하거나
-     비밀번호를 교체하세요
-   - HTTPS 리버스 프록시/로드밸런서 뒤에 배포하는 경우 쿠키의 `Secure` 속성이 정상
-     동작하려면 TLS가 종단(edge)까지 적용되어야 합니다
+2. **Vercel 프로젝트 생성**: [vercel.com](https://vercel.com)에서 GitHub 저장소를 임포트합니다.
+   Framework Preset은 Next.js가 자동 감지됩니다.
+
+3. **환경 변수 설정** (Vercel 프로젝트 → Settings → Environment Variables):
+   | 이름 | 값 |
+   | --- | --- |
+   | `DATABASE_URL` | Postgres 연결 문자열 (개발용과 같은 DB를 써도 되고, 운영 전용 DB를 새로 만들어도 됩니다) |
+   | `AUTH_SECRET` | 새로 생성한 랜덤 값 — 개발용 `.env`의 값을 그대로 쓰지 마세요: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+
+   `TEST_DATABASE_URL`은 로컬 테스트 전용이므로 Vercel에는 설정할 필요가 없습니다.
+
+4. **마이그레이션 적용**: Vercel은 빌드 시 `next build`만 실행하므로, 배포 전(또는
+   최초 1회) 로컬에서 운영 DB를 대상으로 마이그레이션과 시드를 직접 실행합니다.
+   ```bash
+   DATABASE_URL="<운영 DB 연결 문자열>" npx prisma migrate deploy
+   DATABASE_URL="<운영 DB 연결 문자열>" npm run db:seed   # 최초 1회만 — 이미 데이터가 있다면 생략
+   ```
+   (원한다면 `package.json`의 `build` 스크립트를 `prisma migrate deploy && next build`로
+   바꿔 배포 파이프라인에 포함시킬 수도 있습니다.)
+
+5. **Deploy** 클릭 — 이후 `main` 브랜치에 푸시할 때마다 자동 배포됩니다.
+
+**운영 체크리스트**:
+- `AUTH_SECRET`을 개발용 값과 다르게 설정했는지 확인
+- `NODE_ENV=production`이면(Vercel은 자동으로 설정) 세션 쿠키에 `Secure` 속성이
+  자동으로 붙습니다(`src/app/login/actions.ts`)
+- 시드 스크립트의 데모 계정(`password123`)은 실제 서비스 오픈 전 반드시 삭제하거나
+  비밀번호를 교체하세요
+- Vercel은 HTTPS가 기본 적용되므로 쿠키의 `Secure` 속성 관련 별도 설정은 필요 없습니다
 
 ## 실행 방법
 
@@ -451,12 +457,16 @@ npm install
 
 ### 2. 환경 변수 확인
 
-`.env` 파일에 SQLite 연결 정보와 세션 서명 키가 이미 설정되어 있습니다(로컬 개발용으로
-바로 쓸 수 있게 채워져 있음). 새로 클론한 경우 `.env.example`을 참고해 만드세요.
+새로 클론한 경우 `.env.example`을 참고해 `.env`를 만드세요. `DATABASE_URL`(개발/운영용)과
+`TEST_DATABASE_URL`(테스트 전용)에 각각 Postgres 연결 문자열을 넣어야 합니다 — 두 값을
+같은 DB로 둬도 동작은 하지만, 테스트가 `beforeEach`마다 데이터를 지우므로 개발 중인
+데이터가 날아가지 않도록 **서로 다른 DB**를 쓰는 것을 권장합니다(Prisma Postgres는
+무료로 프로젝트를 여러 개 만들 수 있습니다 — console.prisma.io 참고).
 
 ```
-DATABASE_URL="file:./dev.db"
-AUTH_SECRET="..."   # 세션 JWT 서명 키 — 운영 배포 시 반드시 새 값으로 교체
+DATABASE_URL="postgres://..."       # 개발/운영용 DB
+TEST_DATABASE_URL="postgres://..."  # 테스트 전용 DB
+AUTH_SECRET="..."                    # 세션 JWT 서명 키 — 운영 배포 시 반드시 새 값으로 교체
 ```
 
 ### 3. 데이터베이스 마이그레이션
@@ -465,8 +475,8 @@ AUTH_SECRET="..."   # 세션 JWT 서명 키 — 운영 배포 시 반드시 새 
 npm run db:migrate
 ```
 
-최초 실행 시 `dev.db` 파일과 테이블이 생성됩니다. 이미 생성된 마이그레이션이 있다면
-이 명령은 변경 없이 스키마 동기화 상태만 확인합니다.
+`DATABASE_URL`이 가리키는 Postgres DB에 테이블이 생성됩니다. 이미 생성된 마이그레이션이
+있다면 이 명령은 변경 없이 스키마 동기화 상태만 확인합니다.
 
 ### 4. 시드 데이터 삽입
 
@@ -474,10 +484,10 @@ npm run db:migrate
 npm run db:seed
 ```
 
-강사 5명(각기 다른 팀, 1명은 비활성 상태) + 이번 달(2026년 7월) 샘플 스케줄(강사별
-3~5건, 강의/개인일정 혼합) + 로그인 계정 7개(강사 5 + 팀장 1 + 매니저 1, 비밀번호
-`password123`)가 삽입됩니다. 스크립트는 실행 전 기존 데이터를 삭제(`deleteMany`)하므로
-반복 실행해도 안전합니다.
+강사 5명(각기 다른 팀, 1명은 비활성 상태) + 이번 달 샘플 스케줄(강사별 3~5건, 강의/개인일정
+혼합) + 로그인 계정 9개(강사 5 + 팀장 1 + 매니저 1 + 일반 사용자 2— 승인됨/승인대기 각 1개,
+비밀번호 `password123`) + 강의 유형 2개(강사 배정 포함)가 삽입됩니다. 스크립트는 실행 전
+기존 데이터를 삭제(`deleteMany`)하므로 반복 실행해도 안전합니다.
 
 ### 5. 개발 서버 실행
 

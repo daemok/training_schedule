@@ -11,7 +11,7 @@ function isPublicPath(pathname: string): boolean {
 /**
  * 모든 화면/이의 API 요청은 로그인(세션 쿠키)이 있어야 통과한다. (요구사항: 인증되지
  * 않은 사용자는 어떤 화면에도 접근할 수 없어야 함)
- * 세션 검증은 better-sqlite3(Node 전용)를 쓰지 않는 서명 검증만으로 이뤄지므로
+ * 세션 검증은 pg(Node 전용 Postgres 드라이버)를 쓰지 않는 서명 검증만으로 이뤄지므로
  * Edge 런타임에서도 DB 조회 없이 실행된다.
  */
 export async function proxy(request: NextRequest) {

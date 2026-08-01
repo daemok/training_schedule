@@ -4,7 +4,7 @@ import { SESSION_MAX_AGE_SECONDS } from "./constants";
 /**
  * 세션은 상태를 서버에 저장하지 않는 서명된 JWT 쿠키다(edge/node 런타임 어디서나
  * DB 조회 없이 검증 가능해야 하므로 — 라우트 가드(proxy.ts)는 Edge 런타임에서 실행되고
- * better-sqlite3(Prisma 어댑터)는 Edge에서 사용할 수 없다).
+ * pg(Prisma 어댑터가 쓰는 Postgres 드라이버)는 Edge에서 사용할 수 없다).
  * 로그아웃은 쿠키 삭제로만 처리되며, 만료 전 강제 무효화는 지원하지 않는다(짧은 만료시간으로 완화).
  */
 
