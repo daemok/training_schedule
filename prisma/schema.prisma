@@ -1,0 +1,245 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 강사 활성 상태
+enum InstructorStatus {
+  ACTIVE // 활성
+  INACTIVE // 비활성
+}
+
+// 스케줄 시간대 구분
+enum TimeBlock {
+  MORNING // 오전
+  AFTERNOON // 오후
+  EVENING // 저녁
+}
+
+// 스케줄 종류
+enum ScheduleType {
+  LECTURE // 강의
+  PERSONAL // 개인일정
+}
+
+// 스케줄 확정 상태 — 일반 사용자의 강의 신청으로 생성된 스케줄은 PROVISIONAL(가신청)로
+// 시작하며, 강사 본인 또는 팀장/매니저가 확정하면 CONFIRMED로 바뀐다.
+enum ScheduleStatus {
+  CONFIRMED // 확정
+  PROVISIONAL // 가신청 — 강의 신청이 아직 확정되지 않은 상태
+}
+
+// 로그인 계정의 역할. 권한 체계의 기준이 되는 값이며 세션(JWT)에 그대로 실린다.
+enum UserRole {
+  INSTRUCTOR // 강사 — 본인 스케줄만 CRUD, 캘린더에서 본인 개인일정만 상세 열람
+  TEAM_LEAD // 팀장 — 상급자. 모든 강사의 스케줄을 조회/등록/수정/삭제 가능, 개인일정 상세도 열람 가능
+  MANAGER // 매니저 — 팀장과 동일한 전체 권한
+  GENERAL // 일반 사용자 — 강사의 강의 가능 일정을 조회하고 강의를 신청. 가입 후 승인 전까지 로그인 불가
+}
+
+// 로그인 계정의 승인 상태. INSTRUCTOR/TEAM_LEAD/MANAGER는 시드/관리자 생성이므로 기본값이
+// APPROVED이고, GENERAL(일반 사용자) 자가 가입은 서버 액션에서 명시적으로 PENDING으로 생성한다.
+enum AccountStatus {
+  PENDING // 가입 후 팀장/매니저 승인 대기 중 — 로그인 불가
+  APPROVED // 승인 완료 — 로그인 가능
+  REJECTED // 승인 거절 — 로그인 불가
+}
+
+// 강의 신청 처리 상태
+enum LectureRequestStatus {
+  PENDING // 신청 접수, 확정 대기(가신청)
+  CONFIRMED // 강사 본인 또는 팀장/매니저가 확정
+  REJECTED // 강사 본인 또는 팀장/매니저가 거절 — 점유했던 스케줄 슬롯은 해제된다
+}
+
+model Instructor {
+  id        Int               @id @default(autoincrement()) @map("instructor_id")
+  name      String
+  status    InstructorStatus  @default(ACTIVE)
+  team      String
+  schedules Schedule[]
+  user      User?
+  lectureTypes    InstructorLectureType[]
+  lectureRequests LectureRequest[]
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  @@map("instructors")
+}
+
+// 로그인 계정. Instructor(업무 엔티티)와 분리해, 팀장/매니저/일반 사용자처럼 스케줄을
+// 소유하지 않는 역할도 계정을 가질 수 있도록 한다. role=INSTRUCTOR인 계정만 instructorId로
+// 자신의 Instructor row와 1:1 연결되며, 이 연결이 곧 "본인 스케줄"의 소유권 기준이 된다.
+model User {
+  id           Int         @id @default(autoincrement()) @map("user_id")
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  role         UserRole
+  status       AccountStatus @default(APPROVED) @map("status")
+  // 강사 계정은 이름을 Instructor.name에서 가져오므로 보통 비워둔다. 팀장/매니저/일반
+  // 사용자 계정(특히 자가 가입한 일반 사용자)의 표시 이름으로 쓰인다.
+  name         String?
+  instructorId Int?        @unique @map("instructor_id")
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+  notifications Notification[]
+  lectureRequestsMade      LectureRequest[] @relation("RequesterLectureRequests")
+  lectureRequestsConfirmed LectureRequest[] @relation("ConfirmerLectureRequests")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// 앱 내 알림. 강사(또는 강사를 대신한 팀장/매니저)가 신규 일정을 등록하면 모든 팀장 계정에게
+// 알림이 생성된다. scheduleId는 참고용일 뿐 FK가 아니다 — 스케줄이 나중에 삭제되어도
+// 알림 문구/이력은 남는다. 팀장은 개인일정 상세를 열람할 권한이 있으므로 message에는
+// 실제 제목/사유가 그대로 담긴다.
+model Notification {
+  id          Int      @id @default(autoincrement()) @map("notification_id")
+  recipientId Int      @map("recipient_id")
+  recipient   User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  message     String
+  scheduleId  Int?     @map("schedule_id")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([recipientId, isRead])
+  @@map("notifications")
+}
+
+model Schedule {
+  id           Int          @id @default(autoincrement()) @map("schedule_id")
+  instructorId Int          @map("instructor_id")
+  instructor   Instructor   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  date         DateTime // 스케줄 날짜 (시간 없이 날짜 단위로 사용)
+  timeBlock    TimeBlock    @map("time_block") // 오전/오후/저녁
+
+  // 개인일정은 블록 단위(오전/오후/저녁 전체, 혹은 "종일"이면 세 블록 각각에 한 row씩)로만
+  // 등록할 수 있어 시작/종료 시각이 없을 수 있다(null = 해당 블록 전체를 점유). 강의는 항상
+  // 시작/종료 시각이 채워진다. src/lib/schedule-input.ts가 이 규칙을 강제한다.
+  startTime    String?      @map("start_time") // "HH:mm" 형식 문자열, null이면 블록 전체
+  endTime      String?      @map("end_time")
+
+  scheduleType ScheduleType @map("schedule_type")
+  status       ScheduleStatus @default(CONFIRMED) // 강의 신청으로 생성되면 PROVISIONAL(가신청)로 시작
+
+  // ⚠️ 본인 전용 필드(Owner-only field)
+  // scheduleType === PERSONAL(개인일정)인 경우, 이 필드의 실제 값은 스케줄의 소유 강사
+  // 본인 또는 팀장/매니저(상급자 — 모든 강사의 개인일정을 열람할 수 있음) 세션에서만
+  // 조회 가능해야 하며, 그 외 다른 강사에게는 "개인 일정"이라는 고정 문구로 마스킹된다.
+  // 실제 접근 제어(역할/세션 기반 마스킹) 로직은 src/lib/access-control.ts 에서 구현한다.
+  title        String
+  location     String?
+
+  // ⚠️ 본인 전용 필드(Owner-only field) — title과 동일한 마스킹 규칙 적용 대상.
+  // scheduleType === PERSONAL 인 경우 소유 강사/팀장/매니저 외에는 null 처리되어야 한다.
+  memo         String?
+
+  lectureRequest LectureRequest?
+
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@index([instructorId, date])
+  @@map("schedules")
+}
+
+// 스케줄 삭제 이력 로그.
+// 스케줄이 삭제될 때, 원본 데이터를 스냅샷으로 남겨 추후 감사(audit)에 사용한다.
+// schedule 원본 row는 실제로 삭제되므로 FK 관계를 걸지 않고 값만 보관한다.
+model ScheduleDeleteLog {
+  id           Int          @id @default(autoincrement()) @map("log_id")
+  scheduleId   Int          @map("schedule_id") // 삭제된 스케줄의 원래 schedule_id
+  instructorId Int          @map("instructor_id")
+
+  date         DateTime
+  timeBlock    TimeBlock    @map("time_block")
+  startTime    String?      @map("start_time")
+  endTime      String?      @map("end_time")
+  scheduleType ScheduleType @map("schedule_type")
+  title        String
+  location     String?
+  memo         String?
+
+  // 삭제를 수행한 계정의 user_id — 강사 본인 또는 팀장/매니저(다른 강사의 스케줄을 대신 삭제한 경우)
+  deletedByUserId Int       @map("deleted_by")
+  deletedAt    DateTime     @default(now()) @map("deleted_at")
+
+  @@index([instructorId])
+  @@map("schedule_delete_logs")
+}
+
+// 강의 유형 마스터. 팀장/매니저가 "강사 Pool 관리" 화면에서 생성/비활성화한다.
+model LectureType {
+  id          Int      @id @default(autoincrement()) @map("lecture_type_id")
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  instructors InstructorLectureType[]
+  lectureRequests LectureRequest[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("lecture_types")
+}
+
+// 강사별 "가르칠 수 있는 강의 유형" — 팀장/매니저만 관리한다(강사 Pool 관리).
+model InstructorLectureType {
+  id            Int         @id @default(autoincrement())
+  instructorId  Int         @map("instructor_id")
+  instructor    Instructor  @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  lectureTypeId Int         @map("lecture_type_id")
+  lectureType   LectureType @relation(fields: [lectureTypeId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@unique([instructorId, lectureTypeId])
+  @@map("instructor_lecture_types")
+}
+
+// 일반 사용자의 강의 신청. 신청 즉시 Schedule row가 PROVISIONAL(가신청)로 생성되어 해당
+// 강사의 그 시간 슬롯을 점유하고(다른 신청/등록과 겹칠 수 없음), 강사 본인 또는 팀장/매니저가
+// 확정(CONFIRMED)하거나 거절(거절 시 점유했던 Schedule row는 삭제되어 슬롯이 다시 열린다)한다.
+model LectureRequest {
+  id            Int      @id @default(autoincrement()) @map("lecture_request_id")
+  requesterId   Int      @map("requester_id")
+  requester     User     @relation("RequesterLectureRequests", fields: [requesterId], references: [id])
+  instructorId  Int      @map("instructor_id")
+  instructor    Instructor @relation(fields: [instructorId], references: [id])
+  lectureTypeId Int      @map("lecture_type_id")
+  lectureType   LectureType @relation(fields: [lectureTypeId], references: [id])
+
+  date          DateTime
+  timeBlock     TimeBlock @map("time_block") // 신청 대상 블록(오전/오후/저녁) — 요청 시각은 이 블록 범위 내여야 한다
+  startTime     String   @map("start_time")
+  endTime       String   @map("end_time")
+
+  fcLos         String   @map("fc_los") // "FC/LOS" — 신청자 소속/코드 식별값
+  location      String
+  attendeeCount Int      @map("attendee_count")
+  content       String // 요청 강의 내용
+
+  status        LectureRequestStatus @default(PENDING)
+
+  // 이 신청으로 점유된(또는 확정된) 스케줄. 거절되면 스케줄 row가 삭제되며 이 값도 null이 된다.
+  scheduleId    Int?     @unique @map("schedule_id")
+  schedule      Schedule? @relation(fields: [scheduleId], references: [id])
+
+  confirmedById Int?     @map("confirmed_by_user_id")
+  confirmedBy   User?    @relation("ConfirmerLectureRequests", fields: [confirmedById], references: [id])
+  confirmedAt   DateTime? @map("confirmed_at")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([instructorId, date])
+  @@index([requesterId])
+  @@map("lecture_requests")
+}

@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 캘린더 강사별 categorical 색상 (light/dark 각각 지정된 CSS 변수 사용) */
+.instructor-dot {
+  background-color: var(--ic-light);
+}
+.instructor-accent {
+  border-left-color: var(--ic-light);
+}
+@media (prefers-color-scheme: dark) {
+  .instructor-dot {
+    background-color: var(--ic-dark);
+  }
+  .instructor-accent {
+    border-left-color: var(--ic-dark);
+  }
+}
