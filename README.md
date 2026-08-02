@@ -49,7 +49,7 @@ training_schedule/
 │   │   └── Toast.tsx           # 하단 확인 토스트 (등록/수정/삭제 시 표시)
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── instructors/route.ts        # GET /api/instructors
+│   │   │   ├── instructors/route.ts        # GET(목록)/POST(등록) /api/instructors, [id]/route.ts PATCH(수정)/DELETE(삭제) — 강사 관리, 팀장/매니저 전용
 │   │   │   ├── schedules/route.ts          # GET /api/schedules (기간+강사 필터, 세션 기반 마스킹)
 │   │   │   ├── schedules/export/route.ts   # GET 엑셀(.xlsx) 다운로드 (동일 마스킹 재사용)
 │   │   │   ├── notifications/route.ts      # GET 내 알림 목록
@@ -376,7 +376,7 @@ GET /api/schedules/export?from=2026-07-01&to=2026-08-01&instructor=ALL
 npm test
 ```
 
-Vitest로 5개 영역을 검증합니다(총 51개 테스트, `tests/api/`):
+Vitest로 5개 영역을 검증합니다(총 60개 테스트, `tests/api/`):
 
 | 파일 | 검증 내용 |
 | --- | --- |
@@ -384,7 +384,7 @@ Vitest로 5개 영역을 검증합니다(총 51개 테스트, `tests/api/`):
 | `schedules-calendar.test.ts` | `from`/`to` 필수 검증, 날짜 범위 필터링, `instructor=ALL`(전체 강사) vs `instructor=<id>`(단일 강사) 필터 |
 | `personal-reason-masking.test.ts` | 팀장/매니저 조회·엑셀 다운로드 시 개인일정 `title`/`memo`가 실값 그대로 노출, 다른 강사 조회 시에는 여전히 플레이스홀더로 마스킹, 본인 조회 시에만 실값 노출, 쿼리 파라미터 조작으로 역할 사칭 불가 |
 | `lecture-requests.test.ts` | 강의 신청 생성(권한/유형 자격/시간대 범위/슬롯 충돌 검증), `scope=mine`/`scope=pending` 조회 범위, 확정·거절 권한(대상 강사 본인 또는 팀장/매니저), 거절 시 점유 스케줄 삭제로 슬롯 재오픈 |
-| `general-access.test.ts` | 회원가입(중복 이메일/비밀번호 불일치 거부), `PENDING` 계정 로그인 차단, 일반 사용자의 `/api/my/schedules` 직접 호출 차단, 강의 유형/강사 Pool 관리 권한(팀장/매니저 전용), 가입 승인 관리 권한, 블록 단위(시간 미입력) 개인일정 등록·겹침 규칙 |
+| `general-access.test.ts` | 회원가입(중복 이메일/비밀번호 불일치 거부), `PENDING` 계정 로그인 차단, 일반 사용자의 `/api/my/schedules` 직접 호출 차단, 강의 유형/강사 관리 권한(팀장/매니저 전용), 강사 등록·수정·삭제(스케줄/강의신청 이력 또는 연결 계정이 있으면 삭제 거부), 가입 승인 관리 권한, 블록 단위(시간 미입력) 개인일정 등록·겹침 규칙 |
 
 테스트는 개발/운영용 `DATABASE_URL`과 분리된 `TEST_DATABASE_URL`(전용 Postgres DB)을
 사용합니다(첫 실행 시 `vitest.config.ts`의 `globalSetup`이 자동으로 마이그레이션을

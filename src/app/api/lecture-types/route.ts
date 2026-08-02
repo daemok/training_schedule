@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/require-role";
 /**
  * GET /api/lecture-types — 강의 유형 전체 목록.
  * 로그인한 모든 역할이 조회할 수 있다(일반 사용자는 강의 신청 시 유형을 선택해야 하고,
- * 팀장/매니저는 강사 Pool 관리 화면에서 사용한다). proxy.ts가 이미 로그인 여부를 검증한다.
+ * 팀장/매니저는 강사 관리 화면에서 사용한다). proxy.ts가 이미 로그인 여부를 검증한다.
  */
 export async function GET() {
   const lectureTypes = await prisma.lectureType.findMany({
@@ -14,7 +14,7 @@ export async function GET() {
   return NextResponse.json(lectureTypes);
 }
 
-/** POST /api/lecture-types — 강의 유형 생성 (팀장/매니저 전용, 강사 Pool 관리) */
+/** POST /api/lecture-types — 강의 유형 생성 (팀장/매니저 전용, 강사 관리) */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ["TEAM_LEAD", "MANAGER"]);
   if (!auth.ok) return auth.response;

@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-
-interface InstructorOption {
-  id: number;
-  name: string;
-  team: string;
-  status: "ACTIVE" | "INACTIVE";
-}
+import { InstructorFormModal, InstructorOption, SubmitResult } from "./InstructorFormModal";
+import { Toast } from "@/components/Toast";
 
 interface LectureType {
   id: number;
@@ -22,19 +17,97 @@ interface Props {
   assignmentsByInstructor: Record<string, number[]>;
 }
 
-export function InstructorPoolManager({
-  instructors,
+const TOAST_DURATION_MS = 3000;
+
+export function InstructorManager({
+  instructors: initialInstructors,
   lectureTypes: initialLectureTypes,
   assignmentsByInstructor: initialAssignments,
 }: Props) {
+  const [instructors, setInstructors] = useState(initialInstructors);
   const [lectureTypes, setLectureTypes] = useState(initialLectureTypes);
   const [assignments, setAssignments] = useState<Record<string, number[]>>(initialAssignments);
   const [savingInstructorId, setSavingInstructorId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeDescription, setNewTypeDescription] = useState("");
   const [creatingType, setCreatingType] = useState(false);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingInstructor, setEditingInstructor] = useState<InstructorOption | null>(null);
+  const [deleting, setDeleting] = useState<InstructorOption | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), TOAST_DURATION_MS);
+  }
+
+  function openCreate() {
+    setEditingInstructor(null);
+    setFormOpen(true);
+  }
+  function openEdit(instructor: InstructorOption) {
+    setEditingInstructor(instructor);
+    setFormOpen(true);
+  }
+  function closeForm() {
+    setFormOpen(false);
+    setEditingInstructor(null);
+  }
+
+  async function handleInstructorSubmit(payload: {
+    name: string;
+    team: string;
+    status: "ACTIVE" | "INACTIVE";
+  }): Promise<SubmitResult> {
+    const url = editingInstructor ? `/api/instructors/${editingInstructor.id}` : "/api/instructors";
+    const method = editingInstructor ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const saved = (await res.json()) as InstructorOption;
+      setInstructors((prev) => {
+        const next = editingInstructor
+          ? prev.map((i) => (i.id === saved.id ? saved : i))
+          : [...prev, saved];
+        return next.sort((a, b) => a.name.localeCompare(b.name));
+      });
+      closeForm();
+      showToast(editingInstructor ? "강사 정보가 수정되었습니다." : "강사가 등록되었습니다.");
+      return { ok: true };
+    }
+
+    const data = await res.json().catch(() => ({}));
+    return { ok: false, error: data.error ?? "저장에 실패했습니다." };
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleting) return;
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+
+    const res = await fetch(`/api/instructors/${deleting.id}`, { method: "DELETE" });
+    setDeleteSubmitting(false);
+
+    if (res.ok) {
+      setInstructors((prev) => prev.filter((i) => i.id !== deleting.id));
+      setDeleting(null);
+      showToast("강사가 삭제되었습니다.");
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    setDeleteError(data.error ?? "삭제에 실패했습니다.");
+  }
 
   async function handleCreateLectureType() {
     if (!newTypeName.trim()) return;
@@ -79,7 +152,7 @@ export function InstructorPoolManager({
     });
   }
 
-  async function saveInstructor(instructorId: number) {
+  async function saveAssignments(instructorId: number) {
     setSavingInstructorId(instructorId);
     setError(null);
     const res = await fetch(`/api/instructors/${instructorId}/lecture-types`, {
@@ -88,14 +161,66 @@ export function InstructorPoolManager({
       body: JSON.stringify({ lectureTypeIds: assignments[instructorId] ?? [] }),
     });
     setSavingInstructorId(null);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "저장에 실패했습니다.");
+    if (res.ok) {
+      showToast("강의 유형 배정이 저장되었습니다.");
+      return;
     }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "저장에 실패했습니다.");
   }
 
   return (
     <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강사</h2>
+          <button
+            onClick={openCreate}
+            className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
+          >
+            + 새 강사 등록
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {instructors.length === 0 && (
+            <p className="text-sm text-zinc-500">등록된 강사가 없습니다.</p>
+          )}
+          {instructors.map((instructor) => (
+            <div
+              key={instructor.id}
+              className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2 dark:border-zinc-800"
+            >
+              <div>
+                <span className="font-medium text-black dark:text-zinc-50">{instructor.name}</span>
+                <span className="ml-2 text-sm text-zinc-500">{instructor.team}</span>
+                {instructor.status === "INACTIVE" && (
+                  <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
+                    비활성
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-4 text-sm">
+                <button
+                  onClick={() => openEdit(instructor)}
+                  className="text-zinc-600 hover:underline dark:text-zinc-300"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleting(instructor);
+                  }}
+                  className="text-red-600 hover:underline"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의 유형</h2>
         <div className="flex flex-col gap-2">
@@ -188,7 +313,7 @@ export function InstructorPoolManager({
                   )}
                 </div>
                 <button
-                  onClick={() => saveInstructor(instructor.id)}
+                  onClick={() => saveAssignments(instructor.id)}
                   disabled={savingInstructorId === instructor.id}
                   className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:border-black disabled:opacity-50 dark:border-zinc-700 dark:hover:border-zinc-50"
                 >
@@ -217,6 +342,55 @@ export function InstructorPoolManager({
           );
         })}
       </section>
+
+      {formOpen && (
+        <InstructorFormModal
+          initial={editingInstructor}
+          onCancel={closeForm}
+          onSubmit={handleInstructorSubmit}
+        />
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
+              강사를 삭제할까요?
+            </h2>
+            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+              {deleting.name} ({deleting.team})
+            </p>
+            <p className="mb-4 text-xs text-zinc-500">
+              등록된 스케줄이나 강의 신청 이력, 연결된 로그인 계정이 있으면 삭제할 수 없습니다 —
+              이 경우 비활성화를 사용해주세요.
+            </p>
+            {deleteError && (
+              <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleting(null)}
+                className="rounded-full border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={deleteSubmitting}
+                onClick={handleDeleteConfirm}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {deleteSubmitting ? "삭제 중..." : "삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <Toast message={toast} />}
     </div>
   );
 }

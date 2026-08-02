@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
-import { InstructorPoolManager } from "./InstructorPoolManager";
+import { InstructorManager } from "./InstructorManager";
 
 export default async function AdminInstructorsPage() {
   const user = await getCurrentUser();
@@ -31,9 +31,9 @@ export default async function AdminInstructorsPage() {
           <Link href="/calendar" className="text-sm text-zinc-500 hover:underline">
             ← 캘린더로
           </Link>
-          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">강사 Pool 관리</h1>
+          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">강사 관리</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            강의 유형을 만들고, 각 강사가 가르칠 수 있는 강의 유형을 배정합니다.
+            강사를 등록·수정·삭제하고, 강의 유형을 만들어 강사별로 배정합니다.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -51,7 +51,7 @@ export default async function AdminInstructorsPage() {
         </div>
       </div>
 
-      <InstructorPoolManager
+      <InstructorManager
         instructors={instructors.map((i) => ({ id: i.id, name: i.name, team: i.team, status: i.status }))}
         lectureTypes={lectureTypes}
         assignmentsByInstructor={Object.fromEntries(assignmentsByInstructor)}

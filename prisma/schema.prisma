@@ -177,7 +177,7 @@ model ScheduleDeleteLog {
   @@map("schedule_delete_logs")
 }
 
-// 강의 유형 마스터. 팀장/매니저가 "강사 Pool 관리" 화면에서 생성/비활성화한다.
+// 강의 유형 마스터. 팀장/매니저가 "강사 관리" 화면에서 생성/비활성화한다.
 model LectureType {
   id          Int      @id @default(autoincrement()) @map("lecture_type_id")
   name        String   @unique
@@ -191,7 +191,7 @@ model LectureType {
   @@map("lecture_types")
 }
 
-// 강사별 "가르칠 수 있는 강의 유형" — 팀장/매니저만 관리한다(강사 Pool 관리).
+// 강사별 "가르칠 수 있는 강의 유형" — 팀장/매니저만 관리한다(강사 관리).
 model InstructorLectureType {
   id            Int         @id @default(autoincrement())
   instructorId  Int         @map("instructor_id")

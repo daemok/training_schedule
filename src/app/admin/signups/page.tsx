@@ -31,7 +31,7 @@ export default async function AdminSignupsPage() {
         </div>
         <div className="flex items-center gap-4">
           <Link href="/admin/instructors" className="text-sm text-zinc-500 hover:underline">
-            강사 Pool 관리
+            강사 관리
           </Link>
           <form action={logout}>
             <button

@@ -407,7 +407,7 @@ export function CalendarView({
                 href="/admin/instructors"
                 className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
               >
-                강사 Pool 관리
+                강사 관리
               </Link>
               <Link
                 href="/admin/signups"
