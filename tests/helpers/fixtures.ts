@@ -30,7 +30,7 @@ export async function resetDb() {
 
   const userInstructorA = await prisma.user.create({
     data: {
-      email: "instructorA@test.local",
+      email: "instructora@test.local",
       passwordHash,
       role: "INSTRUCTOR",
       instructorId: instructorA.id,
@@ -38,7 +38,7 @@ export async function resetDb() {
   });
   const userInstructorB = await prisma.user.create({
     data: {
-      email: "instructorB@test.local",
+      email: "instructorb@test.local",
       passwordHash,
       role: "INSTRUCTOR",
       instructorId: instructorB.id,

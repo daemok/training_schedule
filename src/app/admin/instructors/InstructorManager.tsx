@@ -63,6 +63,7 @@ export function InstructorManager({
     name: string;
     team: string;
     status: "ACTIVE" | "INACTIVE";
+    email?: string;
   }): Promise<SubmitResult> {
     const url = editingInstructor ? `/api/instructors/${editingInstructor.id}` : "/api/instructors";
     const method = editingInstructor ? "PATCH" : "POST";
@@ -74,16 +75,25 @@ export function InstructorManager({
     });
 
     if (res.ok) {
-      const saved = (await res.json()) as InstructorOption;
+      const saved = (await res.json()) as InstructorOption & {
+        email?: string;
+        temporaryPassword?: string;
+      };
       setInstructors((prev) => {
         const next = editingInstructor
           ? prev.map((i) => (i.id === saved.id ? saved : i))
           : [...prev, saved];
         return next.sort((a, b) => a.name.localeCompare(b.name));
       });
-      closeForm();
-      showToast(editingInstructor ? "강사 정보가 수정되었습니다." : "강사가 등록되었습니다.");
-      return { ok: true };
+      if (editingInstructor) {
+        closeForm();
+        showToast("강사 정보가 수정되었습니다.");
+        return { ok: true };
+      }
+      // 등록 성공 시에는 모달을 바로 닫지 않고, 모달 안에서 임시 비밀번호를 한 번 보여준 뒤
+      // 사용자가 "확인"을 눌러야 닫히도록 한다(비밀번호는 이 응답에만 담겨 있어 다시 볼 수 없음).
+      showToast("강사가 등록되었습니다.");
+      return { ok: true, email: saved.email, temporaryPassword: saved.temporaryPassword };
     }
 
     const data = await res.json().catch(() => ({}));

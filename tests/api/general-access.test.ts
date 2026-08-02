@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signup } from "@/app/signup/actions";
 import { login } from "@/app/login/actions";
@@ -273,19 +274,60 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
     expect(res.status).toBe(403);
   });
 
-  it("allows a team lead to create an instructor", async () => {
+  it("allows a team lead to create an instructor with a linked login account", async () => {
     const cookie = await sessionCookieFor(fx.userTeamLead);
     const res = await instructorsPOST(
-      makeRequest(BASE, { method: "POST", cookie, body: { name: "새강사", team: "D팀" } })
+      makeRequest(BASE, {
+        method: "POST",
+        cookie,
+        body: { name: "새강사", team: "D팀", email: "new-instructor@test.local" },
+      })
     );
     expect(res.status).toBe(201);
     const created = await res.json();
     expect(created.name).toBe("새강사");
     expect(created.status).toBe("ACTIVE");
+    expect(created.email).toBe("new-instructor@test.local");
+    expect(typeof created.temporaryPassword).toBe("string");
+    expect(created.temporaryPassword.length).toBeGreaterThanOrEqual(8);
 
     const listRes = await instructorsGET();
     const list = await listRes.json();
     expect(list.some((i: { id: number }) => i.id === created.id)).toBe(true);
+
+    const linkedUser = await prisma.user.findUnique({
+      where: { email: "new-instructor@test.local" },
+    });
+    expect(linkedUser?.role).toBe("INSTRUCTOR");
+    expect(linkedUser?.status).toBe("APPROVED");
+    expect(linkedUser?.instructorId).toBe(created.id);
+
+    const matches = await bcrypt.compare(created.temporaryPassword, linkedUser!.passwordHash);
+    expect(matches).toBe(true);
+  });
+
+  it("400s when the email is missing or invalid", async () => {
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+    const res = await instructorsPOST(
+      makeRequest(BASE, {
+        method: "POST",
+        cookie,
+        body: { name: "새강사", team: "D팀", email: "not-an-email" },
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("409s when the email is already in use", async () => {
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+    const res = await instructorsPOST(
+      makeRequest(BASE, {
+        method: "POST",
+        cookie,
+        body: { name: "새강사", team: "D팀", email: fx.userInstructorA.email },
+      })
+    );
+    expect(res.status).toBe(409);
   });
 
   it("400s when name or team is missing", async () => {
