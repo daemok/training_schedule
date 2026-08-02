@@ -63,14 +63,19 @@ export default async function Home() {
             </>
           )}
         </div>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
-          >
-            로그아웃
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/account" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+            비밀번호 변경
+          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+            >
+              로그아웃
+            </button>
+          </form>
+        </div>
       </main>
     </div>
   );
