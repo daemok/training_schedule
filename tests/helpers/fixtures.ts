@@ -9,6 +9,7 @@ export const TEST_PASSWORD = "test-password-123";
  * + 강의 유형 1개(강사A만 배정)를 만든다.
  */
 export async function resetDb() {
+  await prisma.loginAttempt.deleteMany();
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();
   await prisma.lectureType.deleteMany();

@@ -243,3 +243,18 @@ model LectureRequest {
   @@index([requesterId])
   @@map("lecture_requests")
 }
+
+// 로그인 시도 감사 로그 — 무차별 대입 공격 방어(계정 단위/IP 단위 실패 횟수 집계)를 위한
+// 용도로만 쓰인다. User로의 FK를 걸지 않는다: 가입되지 않은 이메일로의 시도도 그대로
+// 기록해야 계정 존재 여부가 노출되지 않기 때문이다(src/lib/login-throttle.ts).
+model LoginAttempt {
+  id        Int      @id @default(autoincrement()) @map("login_attempt_id")
+  ipAddress String   @map("ip_address")
+  email     String
+  succeeded Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ipAddress, createdAt])
+  @@index([email, createdAt])
+  @@map("login_attempts")
+}

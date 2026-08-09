@@ -36,8 +36,8 @@ describe("회원가입 (signup server action)", () => {
       formDataFrom({
         email: "newuser@test.local",
         name: "새 사용자",
-        password: "password123",
-        passwordConfirm: "password123",
+        password: "password123!",
+        passwordConfirm: "password123!",
       })
     );
     expect(result.success).toBe(true);
@@ -53,8 +53,8 @@ describe("회원가입 (signup server action)", () => {
       formDataFrom({
         email: fx.userGeneral.email,
         name: "중복",
-        password: "password123",
-        passwordConfirm: "password123",
+        password: "password123!",
+        passwordConfirm: "password123!",
       })
     );
     expect(result.error).toBeDefined();
@@ -66,8 +66,8 @@ describe("회원가입 (signup server action)", () => {
       formDataFrom({
         email: "mismatch@test.local",
         name: "불일치",
-        password: "password123",
-        passwordConfirm: "password456",
+        password: "password123!",
+        passwordConfirm: "password456!",
       })
     );
     expect(result.error).toBeDefined();

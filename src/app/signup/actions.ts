@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { validatePassword } from "@/lib/password-policy";
 
 export interface SignupState {
   error?: string;
@@ -31,8 +32,9 @@ export async function signup(
   if (!name) {
     return { error: "이름을 입력해주세요." };
   }
-  if (password.length < 8) {
-    return { error: "비밀번호는 8자 이상이어야 합니다." };
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return { error: passwordError };
   }
   if (password !== passwordConfirm) {
     return { error: "비밀번호가 일치하지 않습니다." };

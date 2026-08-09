@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { validatePassword } from "@/lib/password-policy";
 
 export interface ChangePasswordState {
   error?: string;
@@ -26,8 +27,9 @@ export async function changePassword(
   if (!currentPassword || !newPassword || !newPasswordConfirm) {
     return { error: "모든 항목을 입력해주세요." };
   }
-  if (newPassword.length < 8) {
-    return { error: "새 비밀번호는 8자 이상이어야 합니다." };
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    return { error: passwordError };
   }
   if (newPassword !== newPasswordConfirm) {
     return { error: "새 비밀번호가 일치하지 않습니다." };

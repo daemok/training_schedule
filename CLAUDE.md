@@ -50,6 +50,45 @@ below). Auth is a stateless signed JWT session cookie (no session table).
     hand-built `NextRequest` (see `tests/helpers/request.ts`) without needing Next's request
     context.
 
+### Password policy & login brute-force protection
+
+- `src/lib/password-policy.ts` (`validatePassword`) — 8+ chars, must include at least one
+  character from `PASSWORD_SPECIAL_CHARS`, and every character must come from
+  `[A-Za-z0-9]` + that same special-char set (rejects spaces, emoji, control characters, etc.).
+  Called from every path where a human picks their own password: `signup/actions.ts` and
+  `account/actions.ts` (`changePassword`). **Not** called for admin-generated temporary passwords
+  (instructor creation, `/api/users/[id]/reset-password`) — those are produced by
+  `src/lib/temporary-password.ts`, which now injects one random char from
+  `PASSWORD_SPECIAL_CHARS` at a random position so generated passwords always satisfy the same
+  policy by construction, without needing a separate validation call.
+- `src/lib/login-throttle.ts` — brute-force defense for `src/app/login/actions.ts` only (not
+  signup/change-password/reset-password — deliberately scoped to login, the highest-value target).
+  Two independent, purely time-window-based checks against the `LoginAttempt` audit table (no
+  Redis/external store — this runs on serverless Vercel functions with no shared memory, so the
+  window is derived from `createdAt` timestamps in Postgres rather than an in-memory counter):
+  - **Per-account**: ≥5 failed attempts for the same email in the last 15 minutes blocks further
+    attempts for *that* email, even with the correct password — this is deliberate; it's a
+    lockout, not just a "wrong password" response.
+  - **Per-IP**: ≥20 failed attempts from the same IP (`x-forwarded-for`, first value) across *any*
+    emails in the last 15 minutes blocks that IP — catches credential stuffing across many
+    accounts that wouldn't trip the per-account limit.
+  - Only failures are recorded (`recordLoginAttempt(ip, email, succeeded)`); successful logins
+    don't count toward either limit, and status-blocked logins (`PENDING`/`REJECTED` — password
+    was actually correct) aren't recorded at all, since they're not a guessing signal. Both checks
+    run identically regardless of whether the email belongs to a real account, so throttling
+    itself never leaks account existence.
+  - `getClientIp()` reads `headers()` from `next/headers` and falls back to `"unknown"` inside a
+    try/catch — `headers()` throws outside a real request context (bare Vitest), the same
+    constraint documented above for `cookies()`, so this keeps `login()` unit-testable
+    (`tests/api/login-throttle.test.ts`) instead of only being testable end-to-end.
+  - `LoginAttempt` has no FK to `User` (see the model comment in `schema.prisma`) — attempts
+    against nonexistent emails must still be recorded for the throttle to work without leaking
+    which emails are registered. Rows older than 24h are opportunistically pruned (5% chance per
+    write, no cron) rather than kept forever.
+  - `resetDb()` (`tests/helpers/fixtures.ts`) and `prisma/seed.ts` both clear `LoginAttempt` —
+    remember to keep doing this if either script's cleanup list changes, or stale lockouts from a
+    previous run/demo session will carry over.
+
 ### Roles & permissions
 
 Four `UserRole` values: `INSTRUCTOR`, `TEAM_LEAD`, `MANAGER`, `GENERAL`. `User` (login account) is
