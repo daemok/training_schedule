@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
-import { ApplyFlow } from "./ApplyFlow";
+import { ApplyViewSwitcher } from "./ApplyViewSwitcher";
 
 export default async function ApplyPage() {
   const user = await getCurrentUser();
@@ -46,7 +46,7 @@ export default async function ApplyPage() {
         </div>
       </div>
 
-      <ApplyFlow lectureTypes={lectureTypes} />
+      <ApplyViewSwitcher lectureTypes={lectureTypes} />
     </div>
   );
 }

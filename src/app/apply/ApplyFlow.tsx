@@ -4,33 +4,13 @@ import { useEffect, useState } from "react";
 import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
-
-interface LectureType {
-  id: number;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-}
-
-interface InstructorOption {
-  id: number;
-  name: string;
-  team: string;
-  status: "ACTIVE" | "INACTIVE";
-}
-
-interface ScheduleRow {
-  timeBlock: "MORNING" | "AFTERNOON" | "EVENING";
-  instructorId: number;
-  status: "CONFIRMED" | "PROVISIONAL";
-}
-
-const BLOCKS: ScheduleRow["timeBlock"][] = ["MORNING", "AFTERNOON", "EVENING"];
-const BLOCK_LABEL: Record<ScheduleRow["timeBlock"], string> = {
-  MORNING: "오전",
-  AFTERNOON: "오후",
-  EVENING: "저녁",
-};
+import {
+  APPLY_BLOCKS as BLOCKS,
+  APPLY_BLOCK_LABEL as BLOCK_LABEL,
+  type LectureType,
+  type InstructorOption,
+  type ScheduleRow,
+} from "./apply-types";
 
 const TOAST_DURATION_MS = 3000;
 

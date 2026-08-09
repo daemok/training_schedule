@@ -110,10 +110,21 @@ row via `scheduleId` to occupy the slot immediately — see "Lecture requests" b
 
 ### Lecture requests (general users)
 
-- `GENERAL` users pick a lecture type on `/apply`, see which qualified instructors are free for
-  each block that day (computed client-side in `ApplyFlow.tsx` from `/api/schedules`, cross-
-  referenced against `/api/lecture-types/[id]/instructors`), and submit a request via
-  `POST /api/lecture-requests`.
+- `GENERAL` (and `TEAM_LEAD`/`MANAGER`, see above) users pick a lecture type on `/apply` and
+  submit a request via `POST /api/lecture-requests`. `ApplyViewSwitcher.tsx` toggles between two
+  independent sub-views (mirrors `my-schedule`'s list/calendar switcher, sharing no state between
+  them — each fetches its own data):
+  - `ApplyFlow.tsx` (리스트형): pick one date, see qualified instructors × block availability as a
+    table for that single day.
+  - `ApplyCalendarView.tsx` (캘린더형): full month grid; each day cell shows three always-visible
+    오전/오후/저녁 pills (not instructor names — cells are too small) colored by whether *any*
+    qualified instructor is free in that block, with an instructor-filter `<select>` to narrow to
+    one. Clicking a pill with exactly one available instructor opens `RequestFormModal` directly;
+    with more than one it opens a small "강사 선택" picker modal first. Both sub-views share
+    `apply-types.ts` (`LectureType`/`InstructorOption`/`ScheduleRow`/`APPLY_BLOCKS` labels) and the
+    same availability rule: a (date, block) is available for an instructor iff `/api/schedules`
+    (queried with `instructor=ALL` and masked/filtered client-side) has no row for that
+    instructor/date/block, regardless of the row's `scheduleType` or `status`.
 - That POST is transactional: it validates the requested time falls inside
   `TIME_BLOCK_RANGE[timeBlock]` (`src/lib/schedule-labels.ts` — the only place block↔clock-time
   bounds are enforced; regular instructor schedule entry stays free-form), then creates a
