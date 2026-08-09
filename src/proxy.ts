@@ -55,6 +55,12 @@ export async function proxy(request: NextRequest) {
     );
   }
 
+  // 로그인 계정 관리(이메일/이름 수정, 비밀번호 재설정, 삭제) — 팀장도 접근할 수 없는
+  // 매니저 전용 화면(다른 관리 기능과 달리 팀장/매니저 동일 권한이 아님).
+  if (pathname.startsWith("/admin/users") && session.role !== "MANAGER") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
   return NextResponse.next();
 }
 

@@ -1,8 +1,8 @@
-import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/require-role";
+import { generateTemporaryPassword } from "@/lib/temporary-password";
 
 const VALID_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,11 +12,6 @@ export async function GET() {
     orderBy: { name: "asc" },
   });
   return NextResponse.json(instructors);
-}
-
-/** 로그인용 임시 비밀번호를 생성한다(강사에게 한 번만 노출, 이후 본인이 /account에서 변경). */
-function generateTemporaryPassword(): string {
-  return crypto.randomBytes(9).toString("base64").replace(/[+/=]/g, "").slice(0, 12);
 }
 
 /**

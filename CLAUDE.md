@@ -70,6 +70,21 @@ as `PENDING`; every other account is created pre-approved (seed/admin-created).
   `GET/POST /api/lecture-requests`) so they can submit requests the same way a `GENERAL` user
   does — the role guards on those routes/pages allow `GENERAL`, `TEAM_LEAD`, and `MANAGER`
   together (`INSTRUCTOR` is still excluded).
+  **Exception — `/admin/users` (사용자 관리, `src/app/api/users/**`) is `MANAGER`-only**, not
+  `TEAM_LEAD`+`MANAGER` like every other admin feature above. This is the one deliberate carve-out
+  in the role model, guarded independently in `src/proxy.ts` (`pathname.startsWith("/admin/users")`
+  checked after the general `/admin` TEAM_LEAD-or-MANAGER rule), the page itself, and every route
+  under `/api/users`. It manages *all* `User` accounts regardless of role (unlike `/admin/instructors`,
+  which only manages `Instructor` entities): edit email/name, force-reset password to a
+  freshly-generated temporary one (same one-time-reveal UX as instructor creation, see
+  `src/lib/temporary-password.ts`), and delete. Deletion is blocked (409) if the target has any
+  `LectureRequest` as requester or confirmer (no `onDelete: Cascade` on those FKs — deleting would
+  otherwise throw a DB error) and self-deletion is blocked (400) regardless of history, to prevent
+  a manager locking themselves out. Deleting a `User` never touches the linked `Instructor`/
+  `Schedule` rows — it only removes login capability; instructor deletion still goes through the
+  separate `/admin/instructors` flow, which itself refuses to delete an `Instructor` that still has
+  a linked `User` (see `src/app/api/instructors/[id]/route.ts`), so freeing up an instructor for
+  deletion now means deleting their `User` here first.
 - **GENERAL**: browses instructor availability by lecture type and submits lecture requests from
   `/apply`; cannot touch `/api/my/schedules` at all (rejected in `resolveScheduleActor`, see
   below) — schedule rows are only ever created for them indirectly via the lecture-request flow.
@@ -169,7 +184,8 @@ row via `scheduleId` to occupy the slot immediately — see "Lecture requests" b
   90 rows).
 - `src/app/admin/` — TEAM_LEAD/MANAGER only (guarded in `src/proxy.ts`): `page.tsx` is the
   dashboard hub, `instructors/` is the lecture-type/instructor-pool manager, `signups/` is the
-  approval queue.
+  approval queue, `users/` is account management (see "Roles & permissions" above — MANAGER-only,
+  the one exception to TEAM_LEAD/MANAGER parity).
 - `src/app/apply/`, `src/app/signup/` — lecture request flow (open to `GENERAL`, `TEAM_LEAD`, and
   `MANAGER` — guarded per-page since `/apply` isn't gated in `src/proxy.ts`) and public signup
   (still `GENERAL`-only).

@@ -103,6 +103,18 @@ export default async function AdminHomePage() {
             일반 사용자와 동일하게 강사의 강의 가능 일정을 확인하고 직접 신청
           </span>
         </Link>
+
+        {user.role === "MANAGER" && (
+          <Link
+            href="/admin/users"
+            className="flex flex-col gap-2 rounded-xl border border-zinc-200 p-5 transition-colors hover:border-black dark:border-zinc-800 dark:hover:border-zinc-50"
+          >
+            <span className="text-lg font-semibold text-black dark:text-zinc-50">사용자 관리</span>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+              로그인 계정의 이메일·이름 수정, 비밀번호 재설정, 삭제 (매니저 전용)
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   );
