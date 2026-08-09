@@ -31,7 +31,7 @@ function validBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("POST /api/lecture-requests", () => {
-  it("403s for non-GENERAL roles", async () => {
+  it("403s for instructor accounts", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorA);
     const res = await POST(makeRequest(BASE, { method: "POST", cookie, body: validBody() }));
     expect(res.status).toBe(403);
@@ -49,6 +49,20 @@ describe("POST /api/lecture-requests", () => {
     expect(schedule?.status).toBe("PROVISIONAL");
     expect(schedule?.scheduleType).toBe("LECTURE");
     expect(schedule?.startTime).toBe("09:30");
+  });
+
+  it("allows team lead and manager accounts to submit requests like a general user", async () => {
+    for (const user of [fx.userTeamLead, fx.userManager]) {
+      const cookie = await sessionCookieFor(user);
+      const res = await POST(
+        makeRequest(BASE, {
+          method: "POST",
+          cookie,
+          body: validBody({ date: user === fx.userTeamLead ? "2026-08-10" : "2026-08-11" }),
+        })
+      );
+      expect(res.status).toBe(201);
+    }
   });
 
   it("400s when requested time is outside the selected block's range", async () => {
@@ -123,6 +137,14 @@ describe("GET /api/lecture-requests", () => {
     await createPendingRequest();
     const cookie = await sessionCookieFor(fx.userTeamLead);
     const res = await GET(makeRequest(`${BASE}?scope=pending`, { method: "GET", cookie }));
+    expect((await res.json())).toHaveLength(1);
+  });
+
+  it("scope=mine works for a team lead who submitted their own request", async () => {
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+    await POST(makeRequest(BASE, { method: "POST", cookie, body: validBody() }));
+    const res = await GET(makeRequest(`${BASE}?scope=mine`, { method: "GET", cookie }));
+    expect(res.status).toBe(200);
     expect((await res.json())).toHaveLength(1);
   });
 });

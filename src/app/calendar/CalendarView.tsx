@@ -404,16 +404,16 @@ export function CalendarView({
                 강의 신청 관리
               </Link>
               <Link
-                href="/admin/instructors"
+                href="/apply"
                 className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
               >
-                강사 관리
+                강의 신청하기
               </Link>
               <Link
-                href="/admin/signups"
+                href="/admin"
                 className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
               >
-                가입 승인
+                관리자 페이지
               </Link>
             </>
           )}

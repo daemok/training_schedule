@@ -64,7 +64,12 @@ as `PENDING`; every other account is created pre-approved (seed/admin-created).
   and delete **any** instructor's schedules (done inline from `/calendar`, not `/my-schedule`,
   which stays instructor-only), see personal-schedule detail (`title`/`memo`) unmasked for every
   instructor, and are the only roles that can reach `/admin/**` (lecture-type/instructor-pool
-  management, signup approvals).
+  management, signup approvals) — `src/app/admin/page.tsx` is a dashboard hub linking to
+  `/admin/instructors`, `/admin/signups`, `/lecture-requests`, and `/apply`. They also have full
+  `GENERAL`-equivalent access to the lecture-request flow itself (`/apply`, `/apply/my`,
+  `GET/POST /api/lecture-requests`) so they can submit requests the same way a `GENERAL` user
+  does — the role guards on those routes/pages allow `GENERAL`, `TEAM_LEAD`, and `MANAGER`
+  together (`INSTRUCTOR` is still excluded).
 - **GENERAL**: browses instructor availability by lecture type and submits lecture requests from
   `/apply`; cannot touch `/api/my/schedules` at all (rejected in `resolveScheduleActor`, see
   below) — schedule rows are only ever created for them indirectly via the lecture-request flow.
@@ -141,9 +146,22 @@ row via `scheduleId` to occupy the slot immediately — see "Lecture requests" b
   failure — there is no "ALL_DAY" enum value, each block is still an independent `Schedule` row.
 - `src/app/my-schedule/` — instructor-only self-service CRUD, list or calendar sub-view
   (`ScheduleViewSwitcher.tsx` / `ScheduleCalendarView.tsx`, reuses the `calendar/` grid components).
-- `src/app/admin/` — TEAM_LEAD/MANAGER only (guarded in `src/proxy.ts`): `instructors/` is the
-  lecture-type/instructor-pool manager, `signups/` is the approval queue.
-- `src/app/apply/`, `src/app/signup/` — GENERAL-only lecture request flow and public signup.
+  `BulkPersonalScheduleModal.tsx` (opened from either sub-view via "+ 개인일정 일괄 등록") lets an
+  instructor multi-select up to `MAX_BULK_PERSONAL_DATES` (30, `src/lib/schedule-bulk.ts`) dates on
+  a small month calendar and register the same block(종일/오전/오후/저녁)+사유 as `PERSONAL`
+  schedules across all of them in one request to `POST /api/my/schedules/bulk`
+  (`src/app/api/my/schedules/bulk/route.ts`, INSTRUCTOR-only — no TEAM_LEAD/MANAGER-on-behalf-of
+  path, unlike the singular `POST /api/my/schedules`). The route pre-checks every (date, block)
+  pair for conflicts and creates nothing on a 409 unless `force:true`; on success all rows are
+  created in one `prisma.$transaction`, and `notifyTeamLeadsOfBulkPersonalSchedule` sends **one**
+  summary notification per team lead instead of one per created row (a "종일" × 30 dates batch is
+  90 rows).
+- `src/app/admin/` — TEAM_LEAD/MANAGER only (guarded in `src/proxy.ts`): `page.tsx` is the
+  dashboard hub, `instructors/` is the lecture-type/instructor-pool manager, `signups/` is the
+  approval queue.
+- `src/app/apply/`, `src/app/signup/` — lecture request flow (open to `GENERAL`, `TEAM_LEAD`, and
+  `MANAGER` — guarded per-page since `/apply` isn't gated in `src/proxy.ts`) and public signup
+  (still `GENERAL`-only).
 - `src/lib/schedule-labels.ts` — single source of truth for `TimeBlock`/`ScheduleType` labels and
   `TIME_BLOCK_RANGE` (lecture-request time validation only).
 - `src/generated/prisma/` — Prisma client output (non-default path, not `node_modules/.prisma`);

@@ -17,8 +17,10 @@ import { WeekView } from "@/app/calendar/WeekView";
 import { DayView } from "@/app/calendar/DayView";
 import { DetailPanel } from "@/app/calendar/DetailPanel";
 import { ScheduleFormModal, ScheduleFormPayload, SubmitResult } from "./ScheduleFormModal";
+import { BulkPersonalScheduleModal, BulkSchedulePayload } from "./BulkPersonalScheduleModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
+import { submitBulkPersonalSchedule, type BulkSubmitResult } from "@/lib/schedule-bulk";
 import type { ScheduleDTO } from "./types";
 
 const TOAST_DURATION_MS = 3000;
@@ -55,6 +57,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleDTO | null>(null);
+  const [bulkFormOpen, setBulkFormOpen] = useState(false);
   const [createPreset, setCreatePreset] = useState<{ date?: string; timeBlock?: TimeBlock } | null>(
     null
   );
@@ -139,6 +142,29 @@ export function ScheduleCalendarView({ instructorId }: Props) {
     setFormOpen(false);
     setEditing(null);
     setCreatePreset(null);
+  }
+
+  function openBulk() {
+    setBulkFormOpen(true);
+  }
+  function closeBulk() {
+    setBulkFormOpen(false);
+  }
+
+  async function handleBulkSubmit(
+    payload: BulkSchedulePayload,
+    force: boolean
+  ): Promise<BulkSubmitResult> {
+    const result = await submitBulkPersonalSchedule({
+      dates: payload.dates,
+      personalBlock: payload.personalBlock,
+      title: payload.title,
+      force,
+    });
+    if (result.ok) {
+      setRefreshKey((k) => k + 1);
+    }
+    return result;
   }
 
   async function handleFormSubmit(
@@ -288,6 +314,12 @@ export function ScheduleCalendarView({ instructorId }: Props) {
             ))}
           </div>
           <button
+            onClick={openBulk}
+            className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
+          >
+            + 개인일정 일괄 등록
+          </button>
+          <button
             onClick={openCreate}
             className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
           >
@@ -360,6 +392,10 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           onCancel={closeForm}
           onSubmit={handleFormSubmit}
         />
+      )}
+
+      {bulkFormOpen && (
+        <BulkPersonalScheduleModal onCancel={closeBulk} onSubmit={handleBulkSubmit} />
       )}
 
       {deleting && (

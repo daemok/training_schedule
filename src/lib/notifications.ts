@@ -33,6 +33,31 @@ export async function notifyTeamLeadsOfNewSchedule(
 }
 
 /**
+ * 강사가 개인일정을 여러 날짜에 걸쳐 일괄 등록하면, row 개수만큼 알림을 쏟아내는 대신
+ * 팀장마다 요약 알림 1건만 남긴다(예: 30일 × 3블록 = 90건이 개별 알림으로 쌓이는 것을 방지).
+ */
+export async function notifyTeamLeadsOfBulkPersonalSchedule(
+  instructorName: string,
+  dateCount: number,
+  scheduleCount: number
+): Promise<void> {
+  const teamLeads = await prisma.user.findMany({
+    where: { role: "TEAM_LEAD" },
+    select: { id: true },
+  });
+  if (teamLeads.length === 0) return;
+
+  const message = `${instructorName} 강사가 개인일정 ${dateCount}일(${scheduleCount}건)을 일괄 등록했습니다.`;
+
+  await prisma.notification.createMany({
+    data: teamLeads.map((u) => ({
+      recipientId: u.id,
+      message,
+    })),
+  });
+}
+
+/**
  * 일반 사용자가 강의를 신청하면, 확정 권한이 있는 대상(신청 대상 강사 본인 + 모든 팀장)에게
  * 알림을 남긴다. 신청 즉시 스케줄이 "가신청" 상태로 그 시간을 점유하므로, 확인 후 확정/거절이
  * 필요하다는 점을 알린다.

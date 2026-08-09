@@ -9,8 +9,8 @@ import {
 } from "./types";
 import { PERSONAL_TITLE_PLACEHOLDER } from "@/lib/access-control";
 import { ALL_DAY_BLOCKS } from "@/lib/schedule-all-day";
-
-export type PersonalBlockChoice = "ALL_DAY" | TimeBlock;
+import type { PersonalBlockChoice } from "./personal-block";
+import { PERSONAL_BLOCK_LABEL } from "./personal-block";
 
 export interface ScheduleFormPayload {
   scheduleType: ScheduleType;
@@ -43,12 +43,6 @@ interface Props {
 }
 
 const LECTURE_TIME_BLOCKS: TimeBlock[] = ["MORNING", "AFTERNOON", "EVENING"];
-const PERSONAL_BLOCK_LABEL: Record<PersonalBlockChoice, string> = {
-  ALL_DAY: "종일",
-  MORNING: "오전",
-  AFTERNOON: "오후",
-  EVENING: "저녁",
-};
 
 export function ScheduleFormModal({
   initial,

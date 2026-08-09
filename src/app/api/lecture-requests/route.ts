@@ -16,7 +16,7 @@ function serialize<T extends { date: Date }>(row: T) {
 
 /**
  * GET /api/lecture-requests?scope=mine|pending
- * - scope=mine: 일반 사용자 본인이 신청한 요청 전체(상태 무관)
+ * - scope=mine: 본인(일반 사용자 또는 강의를 신청한 팀장/매니저)이 신청한 요청 전체(상태 무관)
  * - scope=pending: 확정 대기 목록 — 강사 본인은 자신 앞으로 온 것만, 팀장/매니저는 전체
  */
 export async function GET(request: NextRequest) {
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
   const scope = searchParams.get("scope");
 
   if (scope === "mine") {
-    if (user.role !== "GENERAL") {
-      return NextResponse.json({ error: "일반 사용자 계정만 사용할 수 있습니다." }, { status: 403 });
+    if (user.role !== "GENERAL" && user.role !== "TEAM_LEAD" && user.role !== "MANAGER") {
+      return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
     }
     const rows = await prisma.lectureRequest.findMany({
       where: { requesterId: user.userId },
@@ -63,12 +63,13 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/lecture-requests — 일반 사용자의 강의 신청.
+ * POST /api/lecture-requests — 강의 신청. 일반 사용자뿐 아니라 팀장/매니저도 상급자
+ * 권한으로 동일한 신청 기능을 사용할 수 있다(관리자 역할 확장).
  * 신청 즉시 대상 강사의 스케줄을 PROVISIONAL(가신청)로 점유한다(같은 블록에 다른 스케줄이
  * 있으면 409). 확정/거절은 /api/lecture-requests/[id]/confirm|reject 에서 처리한다.
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireRole(request, ["GENERAL"]);
+  const auth = await requireRole(request, ["GENERAL", "TEAM_LEAD", "MANAGER"]);
   if (!auth.ok) return auth.response;
   const user = auth.user;
 

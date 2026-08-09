@@ -23,7 +23,7 @@ export default async function MyLectureRequestsPage() {
   if (!user) {
     redirect("/login");
   }
-  if (user.role !== "GENERAL") {
+  if (user.role !== "GENERAL" && user.role !== "TEAM_LEAD" && user.role !== "MANAGER") {
     redirect("/calendar");
   }
 

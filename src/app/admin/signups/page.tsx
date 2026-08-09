@@ -21,8 +21,8 @@ export default async function AdminSignupsPage() {
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <Link href="/calendar" className="text-sm text-zinc-500 hover:underline">
-            ← 캘린더로
+          <Link href="/admin" className="text-sm text-zinc-500 hover:underline">
+            ← 관리자 페이지로
           </Link>
           <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">가입 승인 관리</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

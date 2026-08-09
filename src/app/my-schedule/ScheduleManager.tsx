@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ScheduleDTO, TIME_BLOCK_LABEL, SCHEDULE_TYPE_LABEL } from "./types";
 import { ScheduleFormModal, ScheduleFormPayload, SubmitResult } from "./ScheduleFormModal";
+import { BulkPersonalScheduleModal, BulkSchedulePayload } from "./BulkPersonalScheduleModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
+import { submitBulkPersonalSchedule, type BulkSubmitResult } from "@/lib/schedule-bulk";
 
 const TOAST_DURATION_MS = 3000;
 
@@ -39,6 +41,7 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleDTO | null>(null);
+  const [bulkFormOpen, setBulkFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<ScheduleDTO | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -63,6 +66,29 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
   function closeForm() {
     setFormOpen(false);
     setEditing(null);
+  }
+
+  async function handleBulkSubmit(
+    payload: BulkSchedulePayload,
+    force: boolean
+  ): Promise<BulkSubmitResult> {
+    const result = await submitBulkPersonalSchedule({
+      dates: payload.dates,
+      personalBlock: payload.personalBlock,
+      title: payload.title,
+      force,
+    });
+    if (result.ok) {
+      router.refresh();
+    }
+    return result;
+  }
+
+  function openBulk() {
+    setBulkFormOpen(true);
+  }
+  function closeBulk() {
+    setBulkFormOpen(false);
   }
 
   async function handleFormSubmit(
@@ -190,12 +216,20 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
             다음 달 →
           </Link>
         </div>
-        <button
-          onClick={openCreate}
-          className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
-        >
-          + 새 일정 등록
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={openBulk}
+            className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
+          >
+            + 개인일정 일괄 등록
+          </button>
+          <button
+            onClick={openCreate}
+            className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
+          >
+            + 새 일정 등록
+          </button>
+        </div>
       </div>
 
       {grouped.length === 0 ? (
@@ -279,6 +313,10 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
           onCancel={closeForm}
           onSubmit={handleFormSubmit}
         />
+      )}
+
+      {bulkFormOpen && (
+        <BulkPersonalScheduleModal onCancel={closeBulk} onSubmit={handleBulkSubmit} />
       )}
 
       {deleting && (
