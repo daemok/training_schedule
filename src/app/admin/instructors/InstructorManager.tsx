@@ -46,13 +46,17 @@ export function InstructorManager({
 
   const [newBrandName, setNewBrandName] = useState("");
   const [creatingBrand, setCreatingBrand] = useState(false);
+  const [showInactiveBrands, setShowInactiveBrands] = useState(false);
 
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeDescription, setNewTypeDescription] = useState("");
-  const [newTypeBrandId, setNewTypeBrandId] = useState<number | "">(initialBrands[0]?.id ?? "");
+  const [newTypeBrandId, setNewTypeBrandId] = useState<number | "">(
+    initialBrands.find((b) => b.isActive)?.id ?? ""
+  );
   const [newTypeStartDate, setNewTypeStartDate] = useState("");
   const [newTypeEndDate, setNewTypeEndDate] = useState("");
   const [creatingType, setCreatingType] = useState(false);
+  const [showInactiveLectureTypes, setShowInactiveLectureTypes] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState<InstructorOption | null>(null);
@@ -159,6 +163,21 @@ export function InstructorManager({
     setError(data.error ?? "브랜드 생성에 실패했습니다.");
   }
 
+  async function toggleBrandActive(brand: LectureBrand) {
+    const res = await fetch(`/api/lecture-brands/${brand.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !brand.isActive }),
+    });
+    if (res.ok) {
+      const updated = (await res.json()) as LectureBrand;
+      setBrands((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "브랜드 상태 변경에 실패했습니다.");
+  }
+
   async function handleCreateLectureType() {
     if (!newTypeName.trim() || !newTypeBrandId) return;
     setCreatingType(true);
@@ -246,6 +265,10 @@ export function InstructorManager({
     setError(data.error ?? "저장에 실패했습니다.");
   }
 
+  const visibleBrands = brands.filter((b) => showInactiveBrands || b.isActive);
+  const activeBrands = brands.filter((b) => b.isActive);
+  const visibleLectureTypes = lectureTypes.filter((t) => showInactiveLectureTypes || t.isActive);
+
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
@@ -299,17 +322,53 @@ export function InstructorManager({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의 브랜드</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의 브랜드</h2>
+          <button
+            onClick={() => setShowInactiveBrands((prev) => !prev)}
+            className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+          >
+            {showInactiveBrands ? "삭제된 브랜드 숨기기" : "삭제된 브랜드 보기"}
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
-          {brands.length === 0 && <p className="text-sm text-zinc-500">등록된 브랜드가 없습니다.</p>}
-          {brands.map((b) => (
-            <span
-              key={b.id}
-              className="rounded-full border border-zinc-300 px-3 py-1 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              {b.name}
-            </span>
-          ))}
+          {visibleBrands.length === 0 && (
+            <p className="text-sm text-zinc-500">
+              {showInactiveBrands ? "삭제된 브랜드가 없습니다." : "등록된 브랜드가 없습니다."}
+            </p>
+          )}
+          {visibleBrands.map((b) =>
+            b.isActive ? (
+              <span
+                key={b.id}
+                className="flex items-center gap-1.5 rounded-full border border-zinc-300 py-1 pl-3 pr-2 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+              >
+                {b.name}
+                <button
+                  onClick={() => toggleBrandActive(b)}
+                  aria-label={`${b.name} 브랜드 삭제`}
+                  title="삭제 (화면에서만 숨김, 나중에 복원 가능)"
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
+                >
+                  ×
+                </button>
+              </span>
+            ) : (
+              <span
+                key={b.id}
+                className="flex items-center gap-1.5 rounded-full border border-dashed border-zinc-300 py-1 pl-3 pr-2 text-sm text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+              >
+                {b.name}
+                <span className="rounded bg-zinc-100 px-1 text-[10px] dark:bg-zinc-800">삭제됨</span>
+                <button
+                  onClick={() => toggleBrandActive(b)}
+                  className="ml-1 text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+                >
+                  복원
+                </button>
+              </span>
+            )
+          )}
         </div>
         <div className="flex items-end gap-2 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
           <div className="flex-1">
@@ -334,12 +393,22 @@ export function InstructorManager({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의</h2>
+          <button
+            onClick={() => setShowInactiveLectureTypes((prev) => !prev)}
+            className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+          >
+            {showInactiveLectureTypes ? "비활성 강의 숨기기" : "비활성 강의 보기"}
+          </button>
+        </div>
         <div className="flex flex-col gap-2">
-          {lectureTypes.length === 0 && (
-            <p className="text-sm text-zinc-500">개설된 강의가 없습니다.</p>
+          {visibleLectureTypes.length === 0 && (
+            <p className="text-sm text-zinc-500">
+              {showInactiveLectureTypes ? "비활성 강의가 없습니다." : "개설된 강의가 없습니다."}
+            </p>
           )}
-          {lectureTypes.map((t) => (
+          {visibleLectureTypes.map((t) => (
             <div
               key={t.id}
               className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2 dark:border-zinc-800"
@@ -385,8 +454,8 @@ export function InstructorManager({
                 onChange={(e) => setNewTypeBrandId(Number(e.target.value))}
                 className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               >
-                {brands.length === 0 && <option value="">브랜드를 먼저 만들어주세요</option>}
-                {brands.map((b) => (
+                {activeBrands.length === 0 && <option value="">브랜드를 먼저 만들어주세요</option>}
+                {activeBrands.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
