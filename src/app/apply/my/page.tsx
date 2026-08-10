@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDateOnly } from "@/lib/date";
 import { TIME_BLOCK_LABEL } from "@/lib/schedule-labels";
 import { logout } from "@/app/login/actions";
+import { attachQueuePositions } from "@/lib/lecture-request-queue";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "가신청 (확정 대기)",
@@ -32,6 +33,7 @@ export default async function MyLectureRequestsPage() {
     include: { instructor: { select: { name: true } }, lectureType: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
+  const requestsWithPosition = await attachQueuePositions(requests);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
@@ -52,19 +54,22 @@ export default async function MyLectureRequestsPage() {
         </form>
       </div>
 
-      {requests.length === 0 ? (
+      {requestsWithPosition.length === 0 ? (
         <p className="rounded-lg border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
           신청한 강의가 없습니다.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {requests.map((r) => (
+          {requestsWithPosition.map((r) => (
             <li
               key={r.id}
               className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium text-black dark:text-zinc-50">
+                <span className="flex items-center gap-2 font-medium text-black dark:text-zinc-50">
+                  <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white dark:bg-zinc-50 dark:text-black">
+                    {formatDateOnly(r.date)} {TIME_BLOCK_LABEL[r.timeBlock]} {r.queuePosition}번째
+                  </span>
                   {r.lectureType.name} · {r.instructor.name} 강사
                 </span>
                 <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[r.status]}`}>

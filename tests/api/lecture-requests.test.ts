@@ -103,6 +103,38 @@ describe("POST /api/lecture-requests", () => {
     );
     expect(second.status).toBe(409);
   });
+
+  describe("application period (신청 가능 기간)", () => {
+    it("blocks a GENERAL request before the application start date", async () => {
+      await prisma.lectureType.update({
+        where: { id: fx.lectureType.id },
+        data: { applicationStartDate: new Date("2099-01-01T00:00:00.000Z") },
+      });
+      const cookie = await sessionCookieFor(fx.userGeneral);
+      const res = await POST(makeRequest(BASE, { method: "POST", cookie, body: validBody() }));
+      expect(res.status).toBe(400);
+    });
+
+    it("blocks a GENERAL request after the application end date", async () => {
+      await prisma.lectureType.update({
+        where: { id: fx.lectureType.id },
+        data: { applicationEndDate: new Date("2020-01-01T00:00:00.000Z") },
+      });
+      const cookie = await sessionCookieFor(fx.userGeneral);
+      const res = await POST(makeRequest(BASE, { method: "POST", cookie, body: validBody() }));
+      expect(res.status).toBe(400);
+    });
+
+    it("allows a TEAM_LEAD/MANAGER request regardless of application period", async () => {
+      await prisma.lectureType.update({
+        where: { id: fx.lectureType.id },
+        data: { applicationEndDate: new Date("2020-01-01T00:00:00.000Z") },
+      });
+      const cookie = await sessionCookieFor(fx.userTeamLead);
+      const res = await POST(makeRequest(BASE, { method: "POST", cookie, body: validBody() }));
+      expect(res.status).toBe(201);
+    });
+  });
 });
 
 describe("GET /api/lecture-requests", () => {
@@ -146,6 +178,32 @@ describe("GET /api/lecture-requests", () => {
     const res = await GET(makeRequest(`${BASE}?scope=mine`, { method: "GET", cookie }));
     expect(res.status).toBe(200);
     expect((await res.json())).toHaveLength(1);
+  });
+
+  it("assigns queuePosition in submission order among requests sharing the same date+block", async () => {
+    const cookie = await sessionCookieFor(fx.userGeneral);
+    const first = await POST(
+      makeRequest(BASE, {
+        method: "POST",
+        cookie,
+        body: validBody({ startTime: "09:00", endTime: "09:30" }),
+      })
+    );
+    expect(first.status).toBe(201);
+    const second = await POST(
+      makeRequest(BASE, {
+        method: "POST",
+        cookie,
+        body: validBody({ startTime: "10:00", endTime: "10:30" }),
+      })
+    );
+    expect(second.status).toBe(201);
+
+    const res = await GET(makeRequest(`${BASE}?scope=mine`, { method: "GET", cookie }));
+    const rows = (await res.json()) as Array<{ startTime: string; queuePosition: number }>;
+    const byStart = Object.fromEntries(rows.map((r) => [r.startTime, r.queuePosition]));
+    expect(byStart["09:00"]).toBe(1);
+    expect(byStart["10:00"]).toBe(2);
   });
 });
 

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDateOnly } from "@/lib/date";
 import { logout } from "@/app/login/actions";
+import { attachQueuePositions } from "@/lib/lecture-request-queue";
 import { LectureRequestInbox } from "./LectureRequestInbox";
 
 export default async function LectureRequestsPage() {
@@ -27,6 +28,7 @@ export default async function LectureRequestsPage() {
     },
     orderBy: { createdAt: "asc" },
   });
+  const pendingWithPosition = await attachQueuePositions(pending);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
@@ -53,7 +55,7 @@ export default async function LectureRequestsPage() {
       </div>
 
       <LectureRequestInbox
-        initialRequests={pending.map((r) => ({
+        initialRequests={pendingWithPosition.map((r) => ({
           id: r.id,
           instructorName: r.instructor.name,
           lectureTypeName: r.lectureType.name,
@@ -66,6 +68,7 @@ export default async function LectureRequestsPage() {
           location: r.location,
           attendeeCount: r.attendeeCount,
           content: r.content,
+          queuePosition: r.queuePosition,
         }))}
       />
     </div>

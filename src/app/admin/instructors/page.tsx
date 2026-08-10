@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
+import { formatDateOnly } from "@/lib/date";
 import { InstructorManager } from "./InstructorManager";
 
 export default async function AdminInstructorsPage() {
@@ -11,11 +12,26 @@ export default async function AdminInstructorsPage() {
     redirect("/login");
   }
 
-  const [instructors, lectureTypes, links] = await Promise.all([
+  const [instructors, lectureTypesRaw, links, brands] = await Promise.all([
     prisma.instructor.findMany({ orderBy: { name: "asc" } }),
-    prisma.lectureType.findMany({ orderBy: { name: "asc" } }),
+    prisma.lectureType.findMany({
+      orderBy: { name: "asc" },
+      include: { brand: { select: { id: true, name: true } } },
+    }),
     prisma.instructorLectureType.findMany(),
+    prisma.lectureBrand.findMany({ orderBy: { name: "asc" } }),
   ]);
+
+  const lectureTypes = lectureTypesRaw.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    isActive: t.isActive,
+    brandId: t.brandId,
+    brandName: t.brand.name,
+    applicationStartDate: t.applicationStartDate ? formatDateOnly(t.applicationStartDate) : null,
+    applicationEndDate: t.applicationEndDate ? formatDateOnly(t.applicationEndDate) : null,
+  }));
 
   const assignmentsByInstructor = new Map<number, number[]>();
   for (const link of links) {
@@ -54,6 +70,7 @@ export default async function AdminInstructorsPage() {
       <InstructorManager
         instructors={instructors.map((i) => ({ id: i.id, name: i.name, team: i.team, status: i.status }))}
         lectureTypes={lectureTypes}
+        brands={brands}
         assignmentsByInstructor={Object.fromEntries(assignmentsByInstructor)}
       />
     </div>

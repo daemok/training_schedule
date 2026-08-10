@@ -10,9 +10,11 @@ export const TEST_PASSWORD = "test-password-123";
  */
 export async function resetDb() {
   await prisma.loginAttempt.deleteMany();
+  await prisma.requestLock.deleteMany();
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();
   await prisma.lectureType.deleteMany();
+  await prisma.lectureBrand.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
@@ -70,8 +72,9 @@ export async function resetDb() {
     },
   });
 
+  const lectureBrand = await prisma.lectureBrand.create({ data: { name: "테스트 브랜드" } });
   const lectureType = await prisma.lectureType.create({
-    data: { name: "리더십 교육" },
+    data: { name: "리더십 교육", brandId: lectureBrand.id },
   });
   await prisma.instructorLectureType.create({
     data: { instructorId: instructorA.id, lectureTypeId: lectureType.id },
@@ -86,6 +89,7 @@ export async function resetDb() {
     userManager,
     userGeneral,
     userGeneralPending,
+    lectureBrand,
     lectureType,
   };
 }

@@ -5,6 +5,12 @@ import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
 import {
+  acquireRequestLockClient,
+  releaseRequestLockClient,
+  fetchActiveLocksClient,
+  type ActiveLock,
+} from "@/lib/request-lock-client";
+import {
   APPLY_BLOCKS as BLOCKS,
   APPLY_BLOCK_LABEL as BLOCK_LABEL,
   type LectureType,
@@ -14,17 +20,26 @@ import {
 
 const TOAST_DURATION_MS = 3000;
 
+/** 모듈 스코프 헬퍼로 분리 — 컴포넌트 본문에서 직접 Date.now()를 호출하면 렌더 순수성
+ * eslint 규칙(react-hooks/purity)에 걸린다(실제로는 클릭 핸들러 내부라 안전하지만, 정적
+ * 분석은 이를 구분하지 못한다). */
+function computeExpiresAt(expiresInMs: number): number {
+  return Date.now() + expiresInMs;
+}
+
 export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
   const [lectureTypeId, setLectureTypeId] = useState<number | "">(lectureTypes[0]?.id ?? "");
   const [date, setDate] = useState(formatDateOnly(new Date()));
   const [instructors, setInstructors] = useState<InstructorOption[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [locks, setLocks] = useState<ActiveLock[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestTarget, setRequestTarget] = useState<{
     instructorId: number;
     instructorName: string;
     timeBlock: ScheduleRow["timeBlock"];
+    lockExpiresAt: number;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -61,6 +76,7 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
         if (!schedulesRes.ok) throw new Error();
         const rows = (await schedulesRes.json()) as ScheduleRow[];
         setSchedules(rows);
+        setLocks(await fetchActiveLocksClient(date, to));
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           setError("정보를 불러오지 못했습니다.");
@@ -75,6 +91,42 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
 
   function isOccupied(instructorId: number, block: ScheduleRow["timeBlock"]): boolean {
     return schedules.some((s) => s.instructorId === instructorId && s.timeBlock === block);
+  }
+
+  function isLockedByOther(instructorId: number, block: ScheduleRow["timeBlock"]): boolean {
+    return locks.some((l) => l.instructorId === instructorId && l.timeBlock === block && !l.mine);
+  }
+
+  async function handleRequestClick(instructor: InstructorOption, block: ScheduleRow["timeBlock"]) {
+    const result = await acquireRequestLockClient(instructor.id, date, block);
+    if (!result.ok) {
+      setToast(result.error ?? "다른 사용자가 신청 중입니다.");
+      setRefreshKey((k) => k + 1);
+      return;
+    }
+    setRequestTarget({
+      instructorId: instructor.id,
+      instructorName: instructor.name,
+      timeBlock: block,
+      lockExpiresAt: computeExpiresAt(result.expiresInMs ?? 0),
+    });
+  }
+
+  async function handleRequestCancel() {
+    if (requestTarget) {
+      await releaseRequestLockClient(requestTarget.instructorId, date, requestTarget.timeBlock);
+    }
+    setRequestTarget(null);
+    setRefreshKey((k) => k + 1);
+  }
+
+  async function handleRequestTimeout() {
+    if (requestTarget) {
+      await releaseRequestLockClient(requestTarget.instructorId, date, requestTarget.timeBlock);
+    }
+    setRequestTarget(null);
+    setRefreshKey((k) => k + 1);
+    setToast("작성 시간이 초과되어 신청서가 닫혔습니다.");
   }
 
   async function handleRequestSubmit(payload: RequestFormPayload): Promise<SubmitResult> {
@@ -166,21 +218,20 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
                   </td>
                   {BLOCKS.map((block) => {
                     const occupied = isOccupied(instructor.id, block);
+                    const locked = !occupied && isLockedByOther(instructor.id, block);
                     return (
                       <td key={block} className="p-2 text-center">
                         {occupied ? (
                           <span className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-500 dark:bg-zinc-800">
                             신청 불가
                           </span>
+                        ) : locked ? (
+                          <span className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                            입력중
+                          </span>
                         ) : (
                           <button
-                            onClick={() =>
-                              setRequestTarget({
-                                instructorId: instructor.id,
-                                instructorName: instructor.name,
-                                timeBlock: block,
-                              })
-                            }
+                            onClick={() => handleRequestClick(instructor, block)}
                             className="rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300"
                           >
                             신청 가능
@@ -203,7 +254,9 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
           lectureTypeId={lectureTypeId}
           date={date}
           timeBlock={requestTarget.timeBlock}
-          onCancel={() => setRequestTarget(null)}
+          lockExpiresAt={requestTarget.lockExpiresAt}
+          onCancel={handleRequestCancel}
+          onTimeout={handleRequestTimeout}
           onSubmit={handleRequestSubmit}
         />
       )}

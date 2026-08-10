@@ -117,7 +117,7 @@ describe("강의 유형 / 강사 관리 권한 (팀장/매니저 전용)", () =>
       makeRequest("http://localhost/api/lecture-types", {
         method: "POST",
         cookie,
-        body: { name: "새 강의 유형" },
+        body: { name: "새 강의 유형", brandId: fx.lectureBrand.id },
       })
     );
     expect(created.status).toBe(201);

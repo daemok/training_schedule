@@ -5,6 +5,8 @@ import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { findOverlaps } from "@/lib/schedule-overlap";
 import { TIME_BLOCK_RANGE, type TimeBlock } from "@/lib/schedule-labels";
 import { notifyLectureRequestCreated } from "@/lib/notifications";
+import { attachQueuePositions } from "@/lib/lecture-request-queue";
+import { releaseRequestLock } from "@/lib/request-lock";
 
 const TIME_BLOCKS: TimeBlock[] = ["MORNING", "AFTERNOON", "EVENING"];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -36,7 +38,8 @@ export async function GET(request: NextRequest) {
       include: { instructor: { select: { name: true } }, lectureType: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(rows.map(serialize));
+    const withPosition = await attachQueuePositions(rows);
+    return NextResponse.json(withPosition.map(serialize));
   }
 
   if (scope === "pending") {
@@ -56,7 +59,8 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: "asc" },
     });
-    return NextResponse.json(rows.map(serialize));
+    const withPosition = await attachQueuePositions(rows);
+    return NextResponse.json(withPosition.map(serialize));
   }
 
   return NextResponse.json({ error: "scope=mine 또는 scope=pending 이 필요합니다." }, { status: 400 });
@@ -133,6 +137,22 @@ export async function POST(request: NextRequest) {
   if (!lectureType || !lectureType.isActive) {
     return NextResponse.json({ error: "신청할 수 없는 강의 유형입니다." }, { status: 404 });
   }
+  // 신청 가능 기간은 일반 사용자에게만 적용된다 — 팀장/매니저는 상급자로서 기간과 무관하게
+  // 신청할 수 있다(위 POST 주석 참고).
+  if (user.role === "GENERAL") {
+    // 신청 기간은 날짜 단위(자정 기준)로 비교한다 — 종료일 당일까지는 신청 가능해야 하므로
+    // 시각까지 포함한 now를 그대로 비교하면 종료일 당일이 이미 지난 것으로 잘못 처리된다.
+    const today = toDateOnly(formatDateOnly(new Date()));
+    if (lectureType.applicationStartDate && today < lectureType.applicationStartDate) {
+      return NextResponse.json(
+        { error: "아직 신청 기간이 시작되지 않은 강의입니다." },
+        { status: 400 }
+      );
+    }
+    if (lectureType.applicationEndDate && today > lectureType.applicationEndDate) {
+      return NextResponse.json({ error: "신청 기간이 종료된 강의입니다." }, { status: 400 });
+    }
+  }
 
   const qualified = await prisma.instructorLectureType.findUnique({
     where: { instructorId_lectureTypeId: { instructorId, lectureTypeId } },
@@ -185,6 +205,8 @@ export async function POST(request: NextRequest) {
     });
     return lectureRequest;
   });
+
+  await releaseRequestLock(instructorId, dateOnly, timeBlock, user.userId).catch(() => {});
 
   try {
     await notifyLectureRequestCreated({

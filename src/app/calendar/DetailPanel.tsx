@@ -14,9 +14,24 @@ interface Props {
   canManage?: boolean;
   onEdit?: (schedule: CalendarScheduleDTO) => void;
   onDelete?: (schedule: CalendarScheduleDTO) => void;
+  /** true면 이 가신청 건에 대해 확정/거절 버튼을 보여준다(대상 강사 본인 또는 팀장/매니저). */
+  canDecideLectureRequest?: boolean;
+  onConfirmLectureRequest?: (schedule: CalendarScheduleDTO) => void;
+  onRejectLectureRequest?: (schedule: CalendarScheduleDTO) => void;
+  decisionSubmitting?: boolean;
 }
 
-export function DetailPanel({ schedule, onClose, canManage, onEdit, onDelete }: Props) {
+export function DetailPanel({
+  schedule,
+  onClose,
+  canManage,
+  onEdit,
+  onDelete,
+  canDecideLectureRequest,
+  onConfirmLectureRequest,
+  onRejectLectureRequest,
+  decisionSubmitting,
+}: Props) {
   return (
     <div
       className="fixed inset-0 z-40 flex justify-end bg-black/30"
@@ -95,6 +110,27 @@ export function DetailPanel({ schedule, onClose, canManage, onEdit, onDelete }: 
               <dd className="mt-0.5 text-black dark:text-zinc-50">{schedule.memo}</dd>
             </div>
           )}
+
+          {schedule.lectureRequest && (
+            <>
+              <div>
+                <dt className="text-zinc-500 dark:text-zinc-400">신청자</dt>
+                <dd className="mt-0.5 font-medium text-black dark:text-zinc-50">
+                  {schedule.lectureRequest.requesterName} ({schedule.lectureRequest.requesterEmail})
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500 dark:text-zinc-400">FC/LOS · 참석 인원</dt>
+                <dd className="mt-0.5 font-medium text-black dark:text-zinc-50">
+                  {schedule.lectureRequest.fcLos} · {schedule.lectureRequest.attendeeCount}명
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500 dark:text-zinc-400">요청 강의 내용</dt>
+                <dd className="mt-0.5 text-black dark:text-zinc-50">{schedule.lectureRequest.content}</dd>
+              </div>
+            </>
+          )}
         </dl>
 
         {schedule.scheduleType === "PERSONAL" && schedule.title === PERSONAL_TITLE_PLACEHOLDER && (
@@ -102,6 +138,25 @@ export function DetailPanel({ schedule, onClose, canManage, onEdit, onDelete }: 
             개인일정의 상세 사유는 본인 또는 팀장/매니저에게만 공개되며, 그 외에는 &quot;개인
             일정&quot;으로만 표시됩니다.
           </p>
+        )}
+
+        {canDecideLectureRequest && schedule.lectureRequest && (
+          <div className="mt-6 flex justify-end gap-2 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-800">
+            <button
+              onClick={() => onRejectLectureRequest?.(schedule)}
+              disabled={decisionSubmitting}
+              className="rounded-full border border-zinc-300 px-4 py-1.5 hover:border-black disabled:opacity-50 dark:border-zinc-700 dark:hover:border-zinc-50"
+            >
+              거절
+            </button>
+            <button
+              onClick={() => onConfirmLectureRequest?.(schedule)}
+              disabled={decisionSubmitting}
+              className="rounded-full bg-black px-4 py-1.5 font-medium text-white disabled:opacity-50 dark:bg-zinc-50 dark:text-black"
+            >
+              확정
+            </button>
+          </div>
         )}
 
         {canManage && (

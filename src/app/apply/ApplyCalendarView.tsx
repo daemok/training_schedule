@@ -6,6 +6,12 @@ import { buildMonthGridDays, formatMonthTitle, shiftAnchor } from "@/app/calenda
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
 import {
+  acquireRequestLockClient,
+  releaseRequestLockClient,
+  fetchActiveLocksClient,
+  type ActiveLock,
+} from "@/lib/request-lock-client";
+import {
   APPLY_BLOCKS,
   APPLY_BLOCK_LABEL,
   type ApplyTimeBlock,
@@ -30,6 +36,11 @@ function currentMonthAnchor(): Date {
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
 }
 
+/** 모듈 스코프 헬퍼로 분리 — 이유는 ApplyFlow.tsx의 동일 헬퍼 주석 참고. */
+function computeExpiresAt(expiresInMs: number): number {
+  return Date.now() + expiresInMs;
+}
+
 /**
  * 강의 신청 화면의 캘린더형 뷰 — 월 전체를 보여주고, 날짜별로 오전/오후/저녁 블록마다
  * (필터된) 강사 중 신청 가능한 사람이 있는지 표시한다. 칸이 작아 강사 이름 대신 블록
@@ -41,6 +52,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
   const [anchor, setAnchor] = useState(currentMonthAnchor);
   const [instructors, setInstructors] = useState<InstructorOption[]>([]);
   const [schedules, setSchedules] = useState<DatedScheduleRow[]>([]);
+  const [locks, setLocks] = useState<ActiveLock[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerTarget, setPickerTarget] = useState<{
@@ -53,6 +65,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
     instructorName: string;
     date: string;
     timeBlock: ApplyTimeBlock;
+    lockExpiresAt: number;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -94,6 +107,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
         if (!schedulesRes.ok) throw new Error();
         const rows = (await schedulesRes.json()) as DatedScheduleRow[];
         setSchedules(rows);
+        setLocks(await fetchActiveLocksClient(formatDateOnly(monthStart), formatDateOnly(monthEnd)));
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           setError("정보를 불러오지 못했습니다.");
@@ -115,23 +129,54 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
       (c) =>
         !schedules.some(
           (s) => s.date === dateStr && s.instructorId === c.id && s.timeBlock === block
+        ) &&
+        !locks.some(
+          (l) => l.date === dateStr && l.instructorId === c.id && l.timeBlock === block && !l.mine
         )
     );
   }
 
-  function handleBlockClick(dateStr: string, block: ApplyTimeBlock) {
+  async function startRequest(instructor: InstructorOption, dateStr: string, block: ApplyTimeBlock) {
+    const result = await acquireRequestLockClient(instructor.id, dateStr, block);
+    if (!result.ok) {
+      setToast(result.error ?? "다른 사용자가 신청 중입니다.");
+      setRefreshKey((k) => k + 1);
+      return;
+    }
+    setRequestTarget({
+      instructorId: instructor.id,
+      instructorName: instructor.name,
+      date: dateStr,
+      timeBlock: block,
+      lockExpiresAt: computeExpiresAt(result.expiresInMs ?? 0),
+    });
+  }
+
+  async function handleBlockClick(dateStr: string, block: ApplyTimeBlock) {
     const available = availableInstructorsFor(dateStr, block);
     if (available.length === 0) return;
     if (available.length === 1) {
-      setRequestTarget({
-        instructorId: available[0].id,
-        instructorName: available[0].name,
-        date: dateStr,
-        timeBlock: block,
-      });
+      await startRequest(available[0], dateStr, block);
       return;
     }
     setPickerTarget({ date: dateStr, timeBlock: block, candidates: available });
+  }
+
+  async function handleRequestCancel() {
+    if (requestTarget) {
+      await releaseRequestLockClient(requestTarget.instructorId, requestTarget.date, requestTarget.timeBlock);
+    }
+    setRequestTarget(null);
+    setRefreshKey((k) => k + 1);
+  }
+
+  async function handleRequestTimeout() {
+    if (requestTarget) {
+      await releaseRequestLockClient(requestTarget.instructorId, requestTarget.date, requestTarget.timeBlock);
+    }
+    setRequestTarget(null);
+    setRefreshKey((k) => k + 1);
+    setToast("작성 시간이 초과되어 신청서가 닫혔습니다.");
   }
 
   async function handleRequestSubmit(payload: RequestFormPayload): Promise<SubmitResult> {
@@ -317,14 +362,10 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => {
-                    setRequestTarget({
-                      instructorId: c.id,
-                      instructorName: c.name,
-                      date: pickerTarget.date,
-                      timeBlock: pickerTarget.timeBlock,
-                    });
+                  onClick={async () => {
+                    const { date, timeBlock } = pickerTarget;
                     setPickerTarget(null);
+                    await startRequest(c, date, timeBlock);
                   }}
                   className="rounded-md border border-zinc-300 px-3 py-2 text-left text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
                 >
@@ -353,7 +394,9 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
           lectureTypeId={lectureTypeId}
           date={requestTarget.date}
           timeBlock={requestTarget.timeBlock}
-          onCancel={() => setRequestTarget(null)}
+          lockExpiresAt={requestTarget.lockExpiresAt}
+          onCancel={handleRequestCancel}
+          onTimeout={handleRequestTimeout}
           onSubmit={handleRequestSubmit}
         />
       )}

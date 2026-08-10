@@ -13,6 +13,16 @@ export interface InstructorOption {
 
 export type ScheduleStatus = "CONFIRMED" | "PROVISIONAL";
 
+export interface CalendarScheduleLectureRequest {
+  id: number;
+  lectureTypeName: string;
+  requesterName: string;
+  requesterEmail: string;
+  fcLos: string;
+  attendeeCount: number;
+  content: string;
+}
+
 export interface CalendarScheduleDTO {
   id: number;
   date: string; // yyyy-MM-dd
@@ -26,6 +36,8 @@ export interface CalendarScheduleDTO {
   memo: string | null;
   instructorId: number;
   instructorName: string;
+  /** PROVISIONAL(가신청) LECTURE 스케줄에만 존재 — 가신청 상세/확정/거절 UI에 사용. */
+  lectureRequest?: CalendarScheduleLectureRequest | null;
 }
 
 /** 시간대는 항상 텍스트 라벨과 함께 노출되므로 색상만으로 구분에 의존하지 않는다. */

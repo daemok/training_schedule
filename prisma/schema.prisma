@@ -177,17 +177,39 @@ model ScheduleDeleteLog {
   @@map("schedule_delete_logs")
 }
 
-// 강의 유형 마스터. 팀장/매니저가 "강사 관리" 화면에서 생성/비활성화한다.
+// 강의 브랜드 — 강의(LectureType)의 상위 분류. 팀장/매니저가 "강사 관리" 화면에서 관리하며,
+// 강의를 개설할 때 반드시 하나의 브랜드를 선택해야 한다.
+model LectureBrand {
+  id          Int           @id @default(autoincrement()) @map("lecture_brand_id")
+  name        String        @unique
+  isActive    Boolean       @default(true) @map("is_active")
+  lectureTypes LectureType[]
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@map("lecture_brands")
+}
+
+// 강의 유형(=개설된 강의) 마스터. 팀장/매니저가 "강사 관리" 화면에서 생성/비활성화한다.
+// 반드시 하나의 브랜드에 속하며, 신청 가능 기간(applicationStartDate~applicationEndDate)을
+// 지정할 수 있다 — null이면 해당 방향으로 무제한(예: 시작일 없음/종료일 없음)이다. 이 기간은
+// GENERAL(일반 사용자)의 신청에만 적용되고, TEAM_LEAD/MANAGER는 기간과 무관하게 신청할 수
+// 있다(src/app/api/lecture-requests/route.ts).
 model LectureType {
   id          Int      @id @default(autoincrement()) @map("lecture_type_id")
+  brandId     Int      @map("lecture_brand_id")
+  brand       LectureBrand @relation(fields: [brandId], references: [id])
   name        String   @unique
   description String?
+  applicationStartDate DateTime? @map("application_start_date")
+  applicationEndDate   DateTime? @map("application_end_date")
   isActive    Boolean  @default(true) @map("is_active")
   instructors InstructorLectureType[]
   lectureRequests LectureRequest[]
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([brandId])
   @@map("lecture_types")
 }
 
@@ -242,6 +264,24 @@ model LectureRequest {
   @@index([instructorId, date])
   @@index([requesterId])
   @@map("lecture_requests")
+}
+
+// 강의 신청서 작성 중 동시입력 방지 잠금. 한 사용자가 특정 강사/날짜/블록에 대해
+// RequestFormModal을 열면 이 row가 생성되고(10분 TTL), 다른 사용자는 같은 슬롯에 대해
+// 신청서를 열 수 없다. 취소를 누르면 즉시 삭제되고, 제출 완료 시에도 삭제된다 — 10분이
+// 지나면 expiresAt이 지나 다음 acquire 시도에서 자동으로 재사용(reclaim)된다(별도 정리
+// 스케줄러 없이 src/lib/request-lock.ts가 acquire 시점에 조건부로 덮어쓴다).
+model RequestLock {
+  id             Int      @id @default(autoincrement()) @map("request_lock_id")
+  instructorId   Int      @map("instructor_id")
+  date           DateTime
+  timeBlock      TimeBlock @map("time_block")
+  lockedByUserId Int      @map("locked_by_user_id")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([instructorId, date, timeBlock])
+  @@map("request_locks")
 }
 
 // 로그인 시도 감사 로그 — 무차별 대입 공격 방어(계정 단위/IP 단위 실패 횟수 집계)를 위한

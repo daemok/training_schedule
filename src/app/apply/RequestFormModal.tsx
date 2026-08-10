@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { TIME_BLOCK_LABEL, TIME_BLOCK_RANGE, type TimeBlock } from "@/lib/schedule-labels";
 
 export interface RequestFormPayload {
@@ -24,8 +24,18 @@ interface Props {
   lectureTypeId: number;
   date: string;
   timeBlock: TimeBlock;
+  /** 신청서 작성 잠금 만료 시각(ms epoch) — 이 시각이 지나면 자동으로 닫힌다(다른 사용자가 입력할 수 있도록). */
+  lockExpiresAt: number;
   onCancel: () => void;
+  onTimeout: () => void;
   onSubmit: (payload: RequestFormPayload) => Promise<SubmitResult>;
+}
+
+function formatRemaining(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 export function RequestFormModal({
@@ -34,7 +44,9 @@ export function RequestFormModal({
   lectureTypeId,
   date,
   timeBlock,
+  lockExpiresAt,
   onCancel,
+  onTimeout,
   onSubmit,
 }: Props) {
   const range = TIME_BLOCK_RANGE[timeBlock];
@@ -46,6 +58,20 @@ export function RequestFormModal({
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [remainingMs, setRemainingMs] = useState(() => lockExpiresAt - Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const remaining = lockExpiresAt - Date.now();
+      setRemainingMs(remaining);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        onTimeout();
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockExpiresAt]);
 
   function validate(): string | null {
     if (!startTime || !endTime || endTime <= startTime) {
@@ -92,9 +118,24 @@ export function RequestFormModal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
       <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-        <h2 className="mb-1 text-lg font-semibold text-black dark:text-zinc-50">강의 신청</h2>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의 신청</h2>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              remainingMs < 60_000
+                ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            남은 시간 {formatRemaining(remainingMs)}
+          </span>
+        </div>
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           {instructorName} 강사 · {date} · {TIME_BLOCK_LABEL[timeBlock]} ({range.start}~{range.end})
+        </p>
+        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+          이 시간 동안 다른 사용자는 같은 강사·시간대에 신청서를 작성할 수 없습니다. 10분 내에
+          제출하지 않으면 자동으로 닫힙니다.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -17,6 +17,8 @@ interface PendingRequest {
   location: string;
   attendeeCount: number;
   content: string;
+  /** 같은 날짜+시간대에 접수된 순서(1, 2, 3...) — 강의 지역 수용 한계 때문에 확인이 필요하다. */
+  queuePosition: number;
 }
 
 const TOAST_DURATION_MS = 3000;
@@ -66,7 +68,10 @@ export function LectureRequestInbox({ initialRequests }: { initialRequests: Pend
               className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium text-black dark:text-zinc-50">
+                <span className="flex items-center gap-2 font-medium text-black dark:text-zinc-50">
+                  <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white dark:bg-zinc-50 dark:text-black">
+                    {r.date} {TIME_BLOCK_LABEL[r.timeBlock]} {r.queuePosition}번째
+                  </span>
                   {r.lectureTypeName} · {r.instructorName} 강사
                 </span>
                 <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">

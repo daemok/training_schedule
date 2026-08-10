@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
+import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { ApplyViewSwitcher } from "./ApplyViewSwitcher";
 
 export default async function ApplyPage() {
@@ -14,8 +15,21 @@ export default async function ApplyPage() {
     redirect("/calendar");
   }
 
+  // 신청 가능 기간은 일반 사용자에게만 적용된다 — 팀장/매니저는 기간과 무관하게 모든 강의를
+  // 볼 수 있다(상급자 예외, src/app/api/lecture-requests/route.ts와 동일한 규칙).
+  const today = toDateOnly(formatDateOnly(new Date()));
   const lectureTypes = await prisma.lectureType.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      ...(user.role === "GENERAL"
+        ? {
+            AND: [
+              { OR: [{ applicationStartDate: null }, { applicationStartDate: { lte: today } }] },
+              { OR: [{ applicationEndDate: null }, { applicationEndDate: { gte: today } }] },
+            ],
+          }
+        : {}),
+    },
     orderBy: { name: "asc" },
   });
 

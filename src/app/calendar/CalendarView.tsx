@@ -73,6 +73,7 @@ export function CalendarView({
   const [deleting, setDeleting] = useState<CalendarScheduleDTO | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const isFirstRun = useRef(true);
@@ -317,6 +318,33 @@ export function CalendarView({
     setDeleteError(data.error ?? "삭제에 실패했습니다.");
   }
 
+  const canDecideLectureRequest =
+    !!selected &&
+    selected.status === "PROVISIONAL" &&
+    selected.scheduleType === "LECTURE" &&
+    !!selected.lectureRequest &&
+    (canManage || (viewerRole === "INSTRUCTOR" && viewerInstructorId === selected.instructorId));
+
+  async function handleLectureRequestDecision(
+    schedule: CalendarScheduleDTO,
+    decision: "confirm" | "reject"
+  ) {
+    if (!schedule.lectureRequest) return;
+    setDecisionSubmitting(true);
+    const res = await fetch(`/api/lecture-requests/${schedule.lectureRequest.id}/${decision}`, {
+      method: "POST",
+    });
+    setDecisionSubmitting(false);
+    if (res.ok) {
+      setSelected(null);
+      setRefreshKey((k) => k + 1);
+      setToast(decision === "confirm" ? "강의 신청을 확정했습니다." : "강의 신청을 거절했습니다.");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setToast(data.error ?? "처리에 실패했습니다.");
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -481,6 +509,10 @@ export function CalendarView({
             setDeleteError(null);
             setDeleting(schedule);
           }}
+          canDecideLectureRequest={canDecideLectureRequest}
+          decisionSubmitting={decisionSubmitting}
+          onConfirmLectureRequest={(schedule) => handleLectureRequestDecision(schedule, "confirm")}
+          onRejectLectureRequest={(schedule) => handleLectureRequestDecision(schedule, "reject")}
         />
       )}
 

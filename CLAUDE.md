@@ -157,17 +157,24 @@ occupies the entire `timeBlock`, used for block-level `PERSONAL` entries; `statu
 `user_id`) → `Notification` (sent to relevant `TEAM_LEAD`/instructor accounts, message contains
 the real title since recipients can see personal detail).
 
-`LectureType` ↔ `InstructorLectureType` (join table — which instructors can teach which type,
-managed only by TEAM_LEAD/MANAGER) ← `LectureRequest` (a `GENERAL` user's request against one
-instructor/lectureType/date/timeBlock; on creation it atomically creates a `PROVISIONAL` `Schedule`
-row via `scheduleId` to occupy the slot immediately — see "Lecture requests" below).
+`LectureBrand` (top-level category, e.g. 뉴트리라이트/아티스트리 — team-lead/manager-managed
+master list) ← `LectureType` (an actual "개설된 강의" under one brand; `applicationStartDate`/
+`applicationEndDate` are nullable — null in a given direction means unbounded, and the whole
+window only constrains `GENERAL` requesters, never `TEAM_LEAD`/`MANAGER`) ↔
+`InstructorLectureType` (join table — which instructors can teach which `LectureType`, managed
+only by TEAM_LEAD/MANAGER) ← `LectureRequest` (a request against one
+instructor/lectureType/date/timeBlock; on creation it atomically creates a `PROVISIONAL`
+`Schedule` row via `scheduleId` to occupy the slot immediately — see "Lecture requests" below).
+`RequestLock` is a separate, short-lived table (10-minute TTL) unrelated to the data model above —
+it exists purely to serialize concurrent access to `RequestFormModal` for the same
+(instructor, date, timeBlock), not to represent any persisted business fact.
 
 ### Lecture requests (general users)
 
-- `GENERAL` (and `TEAM_LEAD`/`MANAGER`, see above) users pick a lecture type on `/apply` and
-  submit a request via `POST /api/lecture-requests`. `ApplyViewSwitcher.tsx` toggles between two
-  independent sub-views (mirrors `my-schedule`'s list/calendar switcher, sharing no state between
-  them — each fetches its own data):
+- `GENERAL` (and `TEAM_LEAD`/`MANAGER`, see above) users pick a lecture (`LectureType`) on `/apply`
+  and submit a request via `POST /api/lecture-requests`. `ApplyViewSwitcher.tsx` toggles between
+  two independent sub-views (mirrors `my-schedule`'s list/calendar switcher, sharing no state
+  between them — each fetches its own data):
   - `ApplyFlow.tsx` (리스트형): pick one date, see qualified instructors × block availability as a
     table for that single day.
   - `ApplyCalendarView.tsx` (캘린더형): full month grid; each day cell shows three always-visible
@@ -178,19 +185,51 @@ row via `scheduleId` to occupy the slot immediately — see "Lecture requests" b
     `apply-types.ts` (`LectureType`/`InstructorOption`/`ScheduleRow`/`APPLY_BLOCKS` labels) and the
     same availability rule: a (date, block) is available for an instructor iff `/api/schedules`
     (queried with `instructor=ALL` and masked/filtered client-side) has no row for that
-    instructor/date/block, regardless of the row's `scheduleType` or `status`.
+    instructor/date/block, regardless of the row's `scheduleType` or `status` — **and** iff there's
+    no active `RequestLock` held by someone else for that slot (see below).
+  - The lecture dropdown itself (fetched via `/api/lecture-types` or the server-rendered prop on
+    `/apply/page.tsx`, which does its own Prisma query rather than calling the API route) is
+    filtered server-side by `applicationStartDate`/`applicationEndDate` **only when the viewer's
+    role is `GENERAL`** — `TEAM_LEAD`/`MANAGER` always see every active lecture regardless of
+    period, matching the same exception applied in the POST validation below.
+- **Concurrent-edit lock** (`src/lib/request-lock.ts`, `POST`/`DELETE`/`GET
+  /api/lecture-requests/locks`): opening `RequestFormModal` acquires a 10-minute lock on
+  (instructorId, date, timeBlock) via `acquireRequestLock` — a plain `create()` that falls back to
+  a conditional `updateMany()` (reclaim if expired or already mine) on a unique-constraint
+  conflict, which is safe under concurrent requests because the `updateMany` WHERE clause is
+  re-evaluated atomically at UPDATE time, not against a stale read. Cancel or successful submit
+  releases it immediately (`releaseRequestLock`); otherwise the modal's own countdown
+  (`RequestFormModal.tsx`, `lockExpiresAt` prop) auto-closes and releases client-side when the
+  10 minutes run out, and the server-side `expiresAt` is the authoritative fallback if the tab is
+  closed instead. `ApplyFlow`/`ApplyCalendarView` fetch `GET .../locks` alongside `/api/schedules`
+  so a slot someone else is actively filling out shows as "입력중" (list view) or simply excluded
+  from "available" (calendar view) rather than only failing at click time.
 - That POST is transactional: it validates the requested time falls inside
   `TIME_BLOCK_RANGE[timeBlock]` (`src/lib/schedule-labels.ts` — the only place block↔clock-time
-  bounds are enforced; regular instructor schedule entry stays free-form), then creates a
-  `Schedule` row with `status: "PROVISIONAL"` **and** the `LectureRequest` row in the same
-  transaction, so the slot is unavailable to anyone else immediately (reuses
-  `findOverlaps` for the conflict check → 409 if taken).
+  bounds are enforced; regular instructor schedule entry stays free-form), checks the
+  `LectureType` application period for `GENERAL` requesters only, then creates a `Schedule` row
+  with `status: "PROVISIONAL"` **and** the `LectureRequest` row in the same transaction, so the
+  slot is unavailable to anyone else immediately (reuses `findOverlaps` for the conflict check →
+  409 if taken), and releases the requester's own `RequestLock` for that slot on success.
 - Confirm/reject (`/api/lecture-requests/[id]/confirm|reject`) reuse `resolveScheduleActor` +
   `canManageSchedule` — only the target instructor or TEAM_LEAD/MANAGER can resolve a request.
   Confirm flips the `Schedule.status` to `CONFIRMED` in place; reject **deletes** the provisional
-  `Schedule` row (freeing the slot) and nulls `LectureRequest.scheduleId`.
-- `src/app/lecture-requests/` is the confirm/reject inbox (instructor sees only their own pending
-  requests; TEAM_LEAD/MANAGER see all). `src/app/apply/my/` is the requester's own status list.
+  `Schedule` row (freeing the slot) and nulls `LectureRequest.scheduleId`. These same two endpoints
+  are called from two places: the dedicated `src/app/lecture-requests/` inbox (instructor sees
+  only their own pending requests; TEAM_LEAD/MANAGER see all) **and** directly from the calendar's
+  `DetailPanel` (`src/app/calendar/DetailPanel.tsx`) when a `PROVISIONAL` `LECTURE` schedule pill
+  is clicked on `/calendar` or `/my-schedule` — `canDecideLectureRequest` there is computed
+  client-side from `canManageSchedule`-equivalent logic (TEAM_LEAD/MANAGER, or the owning
+  instructor). The panel gets the request detail (FC/LOS, attendee count, content, requester) via
+  `fetchMaskedSchedules`'s `lectureRequest` join (`src/lib/schedule-query.ts`), not a second fetch.
+  `src/app/apply/my/` is the requester's own status list.
+- **Queue position**: because venue capacity means not every simultaneous request for a given
+  date+block can be accommodated, every `LectureRequest` returned by `scope=mine`/`scope=pending`
+  (and the two server-rendered pages that duplicate that query, `/lecture-requests` and
+  `/apply/my`) carries a `queuePosition` — its 1-based rank by `createdAt` among *all* requests
+  (any status, any instructor) sharing that exact `date`+`timeBlock`, computed by
+  `attachQueuePositions` (`src/lib/lecture-request-queue.ts`). No region/location dimension is
+  factored in — deliberately scoped to date+block only, per explicit product decision.
 
 ### Key directories
 

@@ -4,6 +4,16 @@ import { formatDateOnly } from "@/lib/date";
 import type { TimeBlock, ScheduleType } from "@/lib/schedule-labels";
 import type { ScheduleStatus } from "@/generated/prisma";
 
+export interface MaskedScheduleLectureRequest {
+  id: number;
+  lectureTypeName: string;
+  requesterName: string;
+  requesterEmail: string;
+  fcLos: string;
+  attendeeCount: number;
+  content: string;
+}
+
 export interface MaskedScheduleRow {
   id: number;
   date: string; // yyyy-MM-dd
@@ -17,6 +27,9 @@ export interface MaskedScheduleRow {
   memo: string | null;
   instructorId: number;
   instructorName: string;
+  // PROVISIONAL(가신청) 상태의 LECTURE 스케줄에만 채워진다 — 캘린더에서 가신청 항목을
+  // 클릭했을 때 상세 내용(FC/LOS, 참석인원, 요청 내용 등)과 확정/거절 버튼을 보여주기 위함.
+  lectureRequest: MaskedScheduleLectureRequest | null;
 }
 
 /**
@@ -35,7 +48,12 @@ export async function fetchMaskedSchedules(params: {
       date: { gte: params.from, lt: params.to },
       ...(params.instructorId ? { instructorId: params.instructorId } : {}),
     },
-    include: { instructor: { select: { name: true } } },
+    include: {
+      instructor: { select: { name: true } },
+      lectureRequest: {
+        include: { lectureType: { select: { name: true } }, requester: { select: { name: true, email: true } } },
+      },
+    },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
 
@@ -54,5 +72,16 @@ export async function fetchMaskedSchedules(params: {
     memo: s.memo,
     instructorId: s.instructorId,
     instructorName: s.instructor.name,
+    lectureRequest: s.lectureRequest
+      ? {
+          id: s.lectureRequest.id,
+          lectureTypeName: s.lectureRequest.lectureType.name,
+          requesterName: s.lectureRequest.requester.name ?? s.lectureRequest.requester.email,
+          requesterEmail: s.lectureRequest.requester.email,
+          fcLos: s.lectureRequest.fcLos,
+          attendeeCount: s.lectureRequest.attendeeCount,
+          content: s.lectureRequest.content,
+        }
+      : null,
   }));
 }

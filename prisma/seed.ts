@@ -22,9 +22,11 @@ function d(day: number) {
 
 async function main() {
   await prisma.loginAttempt.deleteMany();
+  await prisma.requestLock.deleteMany();
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();
   await prisma.lectureType.deleteMany();
+  await prisma.lectureBrand.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
@@ -116,11 +118,12 @@ async function main() {
     ],
   });
 
+  const demoBrand = await prisma.lectureBrand.create({ data: { name: "사내 교육" } });
   const leadership = await prisma.lectureType.create({
-    data: { name: "리더십 교육", description: "팀 리더 대상 리더십/코칭 강의" },
+    data: { name: "리더십 교육", description: "팀 리더 대상 리더십/코칭 강의", brandId: demoBrand.id },
   });
   const dataAnalysis = await prisma.lectureType.create({
-    data: { name: "데이터 분석 입문", description: "비전공자 대상 데이터 분석 기초" },
+    data: { name: "데이터 분석 입문", description: "비전공자 대상 데이터 분석 기초", brandId: demoBrand.id },
   });
 
   await prisma.instructorLectureType.createMany({
