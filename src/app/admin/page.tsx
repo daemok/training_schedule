@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
 
 /**
- * 관리자 페이지 — 팀장/매니저 전용 관리 화면(강사 관리, 가입 승인)으로 이동하는 허브.
+ * 관리자 페이지 — 팀장/매니저 전용 관리 화면(강사 및 강의 관리, 가입 승인)으로 이동하는 허브.
  * 각 카드에 대기 중인 항목 수를 함께 보여줘 어디부터 처리해야 할지 한눈에 파악할 수 있다.
  */
 export default async function AdminHomePage() {
@@ -29,7 +29,7 @@ export default async function AdminHomePage() {
           </Link>
           <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">관리자 페이지</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            강사 등록·강의 유형 관리와 일반 사용자 가입 승인을 이곳에서 처리합니다.
+            강사 등록·강의 프로그램 관리와 일반 사용자 가입 승인을 이곳에서 처리합니다.
           </p>
         </div>
         <form action={logout}>
@@ -47,9 +47,11 @@ export default async function AdminHomePage() {
           href="/admin/instructors"
           className="flex flex-col gap-2 rounded-xl border border-zinc-200 p-5 transition-colors hover:border-black dark:border-zinc-800 dark:hover:border-zinc-50"
         >
-          <span className="text-lg font-semibold text-black dark:text-zinc-50">강사 관리</span>
+          <span className="text-lg font-semibold text-black dark:text-zinc-50">
+            강사 및 강의 관리
+          </span>
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            강사 등록·수정·삭제, 강의 유형 생성 및 강사별 배정
+            강사 등록·수정·삭제, 강의 프로그램 생성 및 강사별 배정
           </span>
           <span className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             등록된 강사 {instructorCount}명

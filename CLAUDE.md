@@ -157,14 +157,19 @@ occupies the entire `timeBlock`, used for block-level `PERSONAL` entries; `statu
 `user_id`) → `Notification` (sent to relevant `TEAM_LEAD`/instructor accounts, message contains
 the real title since recipients can see personal detail).
 
-`LectureBrand` (top-level category, e.g. 뉴트리라이트/아티스트리 — team-lead/manager-managed
-master list) ← `LectureType` (an actual "개설된 강의" under one brand; `applicationStartDate`/
-`applicationEndDate` are nullable — null in a given direction means unbounded, and the whole
-window only constrains `GENERAL` requesters, never `TEAM_LEAD`/`MANAGER`) ↔
-`InstructorLectureType` (join table — which instructors can teach which `LectureType`, managed
-only by TEAM_LEAD/MANAGER) ← `LectureRequest` (a request against one
-instructor/lectureType/date/timeBlock; on creation it atomically creates a `PROVISIONAL`
-`Schedule` row via `scheduleId` to occupy the slot immediately — see "Lecture requests" below).
+`LectureBrand` (e.g. 뉴트리라이트/아티스트리 — team-lead/manager-managed master list) is now
+purely an `Instructor` affiliation: every `Instructor` has a required `brandId` (replaces the old
+free-text `team` field 1:1; the "강사 및 강의 관리" screen's 브랜드 section manages the list and a
+soft-delete/restore toggle, same `isActive` pattern as `LectureType`). `LectureBrand` is **not**
+connected to `LectureType` — that FK was removed; a lecture program's application period is the
+only per-program gate. `LectureType` (an actual "개설된 강의 프로그램"; `applicationStartDate`/
+`applicationEndDate` are nullable — null in a given direction means unbounded, checked against
+current system time, and editable at any time via `PATCH /api/lecture-types/[id]` since the window
+only constrains `GENERAL` requesters, never `TEAM_LEAD`/`MANAGER`) ↔ `InstructorLectureType`
+(join table — which instructors can teach which `LectureType`, managed only by TEAM_LEAD/MANAGER)
+← `LectureRequest` (a request against one instructor/lectureType/date/timeBlock; on creation it
+atomically creates a `PROVISIONAL` `Schedule` row via `scheduleId` to occupy the slot immediately
+— see "Lecture requests" below).
 `RequestLock` is a separate, short-lived table (10-minute TTL) unrelated to the data model above —
 it exists purely to serialize concurrent access to `RequestFormModal` for the same
 (instructor, date, timeBlock), not to represent any persisted business fact.
@@ -237,8 +242,10 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
   above. `GET` here is instructor-own-month-only and unrelated to the TEAM_LEAD/MANAGER flow.
 - `src/app/api/schedules/` — read-only calendar endpoint + `/export` (Excel via `exceljs`), both
   built on `fetchMaskedSchedules`.
-- `src/app/api/lecture-types/`, `src/app/api/instructors/[id]/lecture-types/` — lecture-type CRUD
-  and per-instructor assignment, TEAM_LEAD/MANAGER only.
+- `src/app/api/lecture-types/`, `src/app/api/instructors/[id]/lecture-types/` — lecture program CRUD
+  (name/description/application period, all editable after creation) and per-instructor assignment,
+  TEAM_LEAD/MANAGER only. `src/app/api/lecture-brands/` — brand CRUD, now solely for the
+  `Instructor.brandId` picker (see "Data model" above).
 - `src/app/api/lecture-requests/` — create/list/confirm/reject, described above.
 - `src/app/api/signups/` — pending-signup list + approve/reject, TEAM_LEAD/MANAGER only.
 - `src/app/calendar/` — shared month/week/day calendar for all three staff roles; also where
@@ -261,9 +268,12 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
   summary notification per team lead instead of one per created row (a "종일" × 30 dates batch is
   90 rows).
 - `src/app/admin/` — TEAM_LEAD/MANAGER only (guarded in `src/proxy.ts`): `page.tsx` is the
-  dashboard hub, `instructors/` is the lecture-type/instructor-pool manager, `signups/` is the
-  approval queue, `users/` is account management (see "Roles & permissions" above — MANAGER-only,
-  the one exception to TEAM_LEAD/MANAGER parity).
+  dashboard hub, `instructors/` (page title "강사 및 강의 관리") is the instructor/brand/lecture-
+  program manager (`InstructorManager.tsx` — sections in order: 강사 list+CRUD, 강사별 강의
+  프로그램 배정 immediately below it, 브랜드 (soft-delete/restore), 강의 프로그램 with inline
+  edit for name/description/application dates), `signups/` is the approval queue, `users/` is
+  account management (see "Roles & permissions" above — MANAGER-only, the one exception to
+  TEAM_LEAD/MANAGER parity).
 - `src/app/apply/`, `src/app/signup/` — lecture request flow (open to `GENERAL`, `TEAM_LEAD`, and
   `MANAGER` — guarded per-page since `/apply` isn't gated in `src/proxy.ts`) and public signup
   (still `GENERAL`-only).

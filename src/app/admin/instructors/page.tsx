@@ -12,23 +12,29 @@ export default async function AdminInstructorsPage() {
     redirect("/login");
   }
 
-  const [instructors, lectureTypesRaw, links, brands] = await Promise.all([
-    prisma.instructor.findMany({ orderBy: { name: "asc" } }),
-    prisma.lectureType.findMany({
+  const [instructorsRaw, lectureTypesRaw, links, brands] = await Promise.all([
+    prisma.instructor.findMany({
       orderBy: { name: "asc" },
       include: { brand: { select: { id: true, name: true } } },
     }),
+    prisma.lectureType.findMany({ orderBy: { name: "asc" } }),
     prisma.instructorLectureType.findMany(),
     prisma.lectureBrand.findMany({ orderBy: { name: "asc" } }),
   ]);
+
+  const instructors = instructorsRaw.map((i) => ({
+    id: i.id,
+    name: i.name,
+    status: i.status,
+    brandId: i.brand.id,
+    brandName: i.brand.name,
+  }));
 
   const lectureTypes = lectureTypesRaw.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
     isActive: t.isActive,
-    brandId: t.brandId,
-    brandName: t.brand.name,
     applicationStartDate: t.applicationStartDate ? formatDateOnly(t.applicationStartDate) : null,
     applicationEndDate: t.applicationEndDate ? formatDateOnly(t.applicationEndDate) : null,
   }));
@@ -47,9 +53,11 @@ export default async function AdminInstructorsPage() {
           <Link href="/admin" className="text-sm text-zinc-500 hover:underline">
             ← 관리자 페이지로
           </Link>
-          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">강사 관리</h1>
+          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
+            강사 및 강의 관리
+          </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            강사를 등록·수정·삭제하고, 강의 유형을 만들어 강사별로 배정합니다.
+            강사를 등록·수정·삭제하고, 강의 프로그램을 만들어 강사별로 배정합니다.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -68,7 +76,7 @@ export default async function AdminInstructorsPage() {
       </div>
 
       <InstructorManager
-        instructors={instructors.map((i) => ({ id: i.id, name: i.name, team: i.team, status: i.status }))}
+        instructors={instructors}
         lectureTypes={lectureTypes}
         brands={brands}
         assignmentsByInstructor={Object.fromEntries(assignmentsByInstructor)}

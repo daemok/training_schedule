@@ -5,7 +5,11 @@ import { toDateOnly } from "@/lib/date";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-/** PATCH /api/lecture-types/[id] — 강의 유형 활성/비활성 전환, 이름/설명 수정 (팀장/매니저 전용) */
+/**
+ * PATCH /api/lecture-types/[id] — 강의 프로그램 활성/비활성 전환, 이름/설명/신청 기간 수정
+ * (팀장/매니저 전용). 신청 기간은 시스템 시각 기준으로 강의 신청 가능 여부를 결정하므로
+ * 변경이 필요할 때 언제든 다시 수정할 수 있다.
+ */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const auth = await requireRole(request, ["TEAM_LEAD", "MANAGER"]);
   if (!auth.ok) return auth.response;
@@ -21,7 +25,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     name?: string;
     description?: string | null;
     isActive?: boolean;
-    brandId?: number;
     applicationStartDate?: Date | null;
     applicationEndDate?: Date | null;
   } = {};
@@ -34,17 +37,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
   if (typeof body?.isActive === "boolean") {
     data.isActive = body.isActive;
-  }
-  if (body?.brandId !== undefined) {
-    const brandId = Number(body.brandId);
-    if (!Number.isInteger(brandId)) {
-      return NextResponse.json({ error: "잘못된 브랜드입니다." }, { status: 400 });
-    }
-    const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
-    if (!brand) {
-      return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
-    }
-    data.brandId = brandId;
   }
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   if (body?.applicationStartDate !== undefined) {
@@ -68,9 +60,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  const updated = await prisma.lectureType
-    .update({ where: { id }, data, include: { brand: { select: { id: true, name: true } } } })
-    .catch(() => null);
+  const updated = await prisma.lectureType.update({ where: { id }, data }).catch(() => null);
   if (!updated) {
     return NextResponse.json({ error: "강의 유형을 찾을 수 없습니다." }, { status: 404 });
   }

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/require-role";
 import { getSessionFromRequest } from "@/lib/auth/current-user";
 
-/** GET /api/lecture-brands — 강의 브랜드 전체 목록. 로그인한 모든 역할이 조회할 수 있다. */
+/** GET /api/lecture-brands — 브랜드 전체 목록. 로그인한 모든 역할이 조회할 수 있다. */
 export async function GET(request: NextRequest) {
   const user = await getSessionFromRequest(request);
   if (!user) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(brands);
 }
 
-/** POST /api/lecture-brands — 강의 브랜드 생성 (팀장/매니저 전용, 강사 관리 화면) */
+/** POST /api/lecture-brands — 브랜드 생성 (팀장/매니저 전용, 강사 및 강의 관리 화면) */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ["TEAM_LEAD", "MANAGER"]);
   if (!auth.ok) return auth.response;

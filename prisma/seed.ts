@@ -26,28 +26,33 @@ async function main() {
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();
   await prisma.lectureType.deleteMany();
-  await prisma.lectureBrand.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.user.deleteMany();
   await prisma.instructor.deleteMany();
+  await prisma.lectureBrand.deleteMany();
+
+  const [nutrilite, artistry] = await Promise.all([
+    prisma.lectureBrand.create({ data: { name: "뉴트리라이트" } }),
+    prisma.lectureBrand.create({ data: { name: "아티스트리" } }),
+  ]);
 
   const instructors = await Promise.all([
     prisma.instructor.create({
-      data: { name: "김민준", team: "A팀", status: InstructorStatus.ACTIVE },
+      data: { name: "김민준", brandId: nutrilite.id, status: InstructorStatus.ACTIVE },
     }),
     prisma.instructor.create({
-      data: { name: "이서연", team: "A팀", status: InstructorStatus.ACTIVE },
+      data: { name: "이서연", brandId: nutrilite.id, status: InstructorStatus.ACTIVE },
     }),
     prisma.instructor.create({
-      data: { name: "박도윤", team: "B팀", status: InstructorStatus.ACTIVE },
+      data: { name: "박도윤", brandId: artistry.id, status: InstructorStatus.ACTIVE },
     }),
     prisma.instructor.create({
-      data: { name: "최지우", team: "B팀", status: InstructorStatus.INACTIVE },
+      data: { name: "최지우", brandId: artistry.id, status: InstructorStatus.INACTIVE },
     }),
     prisma.instructor.create({
-      data: { name: "정하은", team: "C팀", status: InstructorStatus.ACTIVE },
+      data: { name: "정하은", brandId: artistry.id, status: InstructorStatus.ACTIVE },
     }),
   ]);
 
@@ -118,12 +123,11 @@ async function main() {
     ],
   });
 
-  const demoBrand = await prisma.lectureBrand.create({ data: { name: "사내 교육" } });
   const leadership = await prisma.lectureType.create({
-    data: { name: "리더십 교육", description: "팀 리더 대상 리더십/코칭 강의", brandId: demoBrand.id },
+    data: { name: "리더십 교육", description: "팀 리더 대상 리더십/코칭 강의" },
   });
   const dataAnalysis = await prisma.lectureType.create({
-    data: { name: "데이터 분석 입문", description: "비전공자 대상 데이터 분석 기초", brandId: demoBrand.id },
+    data: { name: "데이터 분석 입문", description: "비전공자 대상 데이터 분석 기초" },
   });
 
   await prisma.instructorLectureType.createMany({

@@ -45,7 +45,10 @@ export default async function CalendarPage({
   const instructorId = instructorFilter !== "ALL" ? Number(instructorFilter) : undefined;
 
   const [instructors, initialSchedules] = await Promise.all([
-    prisma.instructor.findMany({ orderBy: { id: "asc" } }),
+    prisma.instructor.findMany({
+      orderBy: { id: "asc" },
+      include: { brand: { select: { name: true } } },
+    }),
     fetchMaskedSchedules({
       from: start,
       to: end,
@@ -57,7 +60,7 @@ export default async function CalendarPage({
   const instructorOptions: InstructorOption[] = instructors.map((i) => ({
     id: i.id,
     name: i.name,
-    team: i.team,
+    brand: i.brand.name,
     status: i.status,
   }));
 

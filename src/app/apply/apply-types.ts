@@ -8,7 +8,7 @@ export interface LectureType {
 export interface InstructorOption {
   id: number;
   name: string;
-  team: string;
+  brand: string;
   status: "ACTIVE" | "INACTIVE";
 }
 

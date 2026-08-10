@@ -23,6 +23,7 @@ export default async function MySchedulePage({
 
   const instructor = await prisma.instructor.findUnique({
     where: { id: instructorId },
+    include: { brand: { select: { name: true } } },
   });
   if (!instructor) {
     redirect("/login");
@@ -53,7 +54,7 @@ export default async function MySchedulePage({
             {instructor.name}님의 스케줄
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {instructor.team} · 본인이 등록한 스케줄만 수정/삭제할 수 있습니다.
+            {instructor.brand.name} · 본인이 등록한 스케줄만 수정/삭제할 수 있습니다.
           </p>
         </div>
         <div className="flex items-center gap-4">

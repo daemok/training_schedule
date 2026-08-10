@@ -63,7 +63,10 @@ model Instructor {
   id        Int               @id @default(autoincrement()) @map("instructor_id")
   name      String
   status    InstructorStatus  @default(ACTIVE)
-  team      String
+  // 소속 브랜드 — 과거의 자유 텍스트 "소속팀"을 대체한다. 강사가 강의 가능한 브랜드를
+  // 관리하는 용도로만 쓰이며, 강의 프로그램(LectureType)과는 더 이상 연결되지 않는다.
+  brandId   Int               @map("lecture_brand_id")
+  brand     LectureBrand      @relation(fields: [brandId], references: [id])
   schedules Schedule[]
   user      User?
   lectureTypes    InstructorLectureType[]
@@ -71,6 +74,7 @@ model Instructor {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
+  @@index([brandId])
   @@map("instructors")
 }
 
@@ -177,28 +181,28 @@ model ScheduleDeleteLog {
   @@map("schedule_delete_logs")
 }
 
-// 강의 브랜드 — 강의(LectureType)의 상위 분류. 팀장/매니저가 "강사 관리" 화면에서 관리하며,
-// 강의를 개설할 때 반드시 하나의 브랜드를 선택해야 한다.
+// 브랜드 — 강사의 소속/담당 브랜드. 팀장/매니저가 "강사 및 강의 관리" 화면에서 관리하며,
+// 강사를 등록할 때 반드시 하나의 브랜드를 선택해야 한다. 강의 프로그램(LectureType)과는
+// 더 이상 연결되지 않는다(과거에는 LectureType의 상위 분류였다).
 model LectureBrand {
   id          Int           @id @default(autoincrement()) @map("lecture_brand_id")
   name        String        @unique
   isActive    Boolean       @default(true) @map("is_active")
-  lectureTypes LectureType[]
+  instructors Instructor[]
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   @@map("lecture_brands")
 }
 
-// 강의 유형(=개설된 강의) 마스터. 팀장/매니저가 "강사 관리" 화면에서 생성/비활성화한다.
-// 반드시 하나의 브랜드에 속하며, 신청 가능 기간(applicationStartDate~applicationEndDate)을
-// 지정할 수 있다 — null이면 해당 방향으로 무제한(예: 시작일 없음/종료일 없음)이다. 이 기간은
-// GENERAL(일반 사용자)의 신청에만 적용되고, TEAM_LEAD/MANAGER는 기간과 무관하게 신청할 수
-// 있다(src/app/api/lecture-requests/route.ts).
+// 강의 프로그램(=개설된 강의) 마스터. 팀장/매니저가 "강사 및 강의 관리" 화면에서 생성/수정/
+// 비활성화한다. 신청 가능 기간(applicationStartDate~applicationEndDate)을 지정할 수 있다 —
+// null이면 해당 방향으로 무제한(예: 시작일 없음/종료일 없음)이며, 시스템 현재 시각 기준으로
+// 이 기간을 벗어나면 신청할 수 없다. 이 기간은 GENERAL(일반 사용자)의 신청에만 적용되고,
+// TEAM_LEAD/MANAGER는 기간과 무관하게 신청할 수 있다(src/app/api/lecture-requests/route.ts).
+// 변경될 수 있으므로 팀장/매니저가 언제든 기간을 수정할 수 있다.
 model LectureType {
   id          Int      @id @default(autoincrement()) @map("lecture_type_id")
-  brandId     Int      @map("lecture_brand_id")
-  brand       LectureBrand @relation(fields: [brandId], references: [id])
   name        String   @unique
   description String?
   applicationStartDate DateTime? @map("application_start_date")
@@ -209,7 +213,6 @@ model LectureType {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@index([brandId])
   @@map("lecture_types")
 }
 

@@ -14,21 +14,24 @@ export async function resetDb() {
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();
   await prisma.lectureType.deleteMany();
-  await prisma.lectureBrand.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.user.deleteMany();
   await prisma.instructor.deleteMany();
+  await prisma.lectureBrand.deleteMany();
 
   // 라운드를 낮춰 테스트 속도를 확보한다(운영 코드의 해시 비용과는 무관).
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 4);
 
+  const brandA = await prisma.lectureBrand.create({ data: { name: "A브랜드" } });
+  const brandB = await prisma.lectureBrand.create({ data: { name: "B브랜드" } });
+
   const instructorA = await prisma.instructor.create({
-    data: { name: "테스트강사A", team: "A팀" },
+    data: { name: "테스트강사A", brandId: brandA.id },
   });
   const instructorB = await prisma.instructor.create({
-    data: { name: "테스트강사B", team: "B팀" },
+    data: { name: "테스트강사B", brandId: brandB.id },
   });
 
   const userInstructorA = await prisma.user.create({
@@ -74,7 +77,7 @@ export async function resetDb() {
 
   const lectureBrand = await prisma.lectureBrand.create({ data: { name: "테스트 브랜드" } });
   const lectureType = await prisma.lectureType.create({
-    data: { name: "리더십 교육", brandId: lectureBrand.id },
+    data: { name: "리더십 교육" },
   });
   await prisma.instructorLectureType.create({
     data: { instructorId: instructorA.id, lectureTypeId: lectureType.id },

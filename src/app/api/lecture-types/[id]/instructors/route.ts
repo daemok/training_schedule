@@ -17,9 +17,25 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
   const links = await prisma.instructorLectureType.findMany({
     where: { lectureTypeId: id, instructor: { status: "ACTIVE" } },
-    include: { instructor: { select: { id: true, name: true, team: true, status: true } } },
+    include: {
+      instructor: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          brand: { select: { name: true } },
+        },
+      },
+    },
     orderBy: { instructor: { name: "asc" } },
   });
 
-  return NextResponse.json(links.map((l) => l.instructor));
+  return NextResponse.json(
+    links.map((l) => ({
+      id: l.instructor.id,
+      name: l.instructor.name,
+      status: l.instructor.status,
+      brand: l.instructor.brand.name,
+    }))
+  );
 }

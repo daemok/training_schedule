@@ -5,9 +5,9 @@ import { getSessionFromRequest } from "@/lib/auth/current-user";
 import { toDateOnly, formatDateOnly } from "@/lib/date";
 
 /**
- * GET /api/lecture-types — 강의(유형) 목록.
+ * GET /api/lecture-types — 강의 프로그램 목록.
  * 로그인한 모든 역할이 조회할 수 있다. 일반 사용자(GENERAL)에게는 활성 + 신청 가능
- * 기간 내인 강의만 내려준다(팀장/매니저는 강사 관리 화면 등에서 전체를 봐야 하므로
+ * 기간 내인 강의만 내려준다(팀장/매니저는 강사 및 강의 관리 화면 등에서 전체를 봐야 하므로
  * 기간과 무관하게 전체 반환 — src/app/api/lecture-requests/route.ts와 동일한 예외 규칙).
  */
 export async function GET(request: NextRequest) {
@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
   }
 
   const lectureTypes = await prisma.lectureType.findMany({
-    include: { brand: { select: { id: true, name: true } } },
     orderBy: { name: "asc" },
   });
 
@@ -35,7 +34,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(open);
 }
 
-/** POST /api/lecture-types — 강의 개설 (팀장/매니저 전용, 강사 관리 화면). 브랜드 선택 필수. */
+/** POST /api/lecture-types — 강의 프로그램 개설 (팀장/매니저 전용, 강사 및 강의 관리 화면). */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ["TEAM_LEAD", "MANAGER"]);
   if (!auth.ok) return auth.response;
@@ -44,14 +43,6 @@ export async function POST(request: NextRequest) {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   if (!name) {
     return NextResponse.json({ error: "강의 이름을 입력해주세요." }, { status: 400 });
-  }
-  const brandId = Number(body?.brandId);
-  if (!Number.isInteger(brandId)) {
-    return NextResponse.json({ error: "강의 브랜드를 선택해주세요." }, { status: 400 });
-  }
-  const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
-  if (!brand) {
-    return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
   }
 
   const description =
@@ -83,8 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   const created = await prisma.lectureType.create({
-    data: { name, description, brandId, applicationStartDate, applicationEndDate },
-    include: { brand: { select: { id: true, name: true } } },
+    data: { name, description, applicationStartDate, applicationEndDate },
   });
   return NextResponse.json(created, { status: 201 });
 }

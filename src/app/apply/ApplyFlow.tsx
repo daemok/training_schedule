@@ -214,7 +214,7 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
                 <tr key={instructor.id} className="border-b border-zinc-200 dark:border-zinc-800">
                   <td className="p-2 font-medium text-black dark:text-zinc-50">
                     {instructor.name}
-                    <span className="ml-1 text-xs text-zinc-500">{instructor.team}</span>
+                    <span className="ml-1 text-xs text-zinc-500">{instructor.brand}</span>
                   </td>
                   {BLOCKS.map((block) => {
                     const occupied = isOccupied(instructor.id, block);

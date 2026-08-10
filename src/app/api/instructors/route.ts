@@ -10,6 +10,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function GET() {
   const instructors = await prisma.instructor.findMany({
     orderBy: { name: "asc" },
+    include: { brand: { select: { id: true, name: true } } },
   });
   return NextResponse.json(instructors);
 }
@@ -26,7 +27,6 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const team = typeof body?.team === "string" ? body.team.trim() : "";
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const status =
     typeof body?.status === "string" && VALID_STATUSES.includes(body.status as never)
@@ -36,8 +36,13 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return NextResponse.json({ error: "강사 이름을 입력해주세요." }, { status: 400 });
   }
-  if (!team) {
-    return NextResponse.json({ error: "소속 팀을 입력해주세요." }, { status: 400 });
+  const brandId = Number(body?.brandId);
+  if (!Number.isInteger(brandId)) {
+    return NextResponse.json({ error: "브랜드를 선택해주세요." }, { status: 400 });
+  }
+  const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
+  if (!brand) {
+    return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
   }
   if (!email || !EMAIL_RE.test(email)) {
     return NextResponse.json(
@@ -55,7 +60,10 @@ export async function POST(request: NextRequest) {
   const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
   const created = await prisma.$transaction(async (tx) => {
-    const instructor = await tx.instructor.create({ data: { name, team, status } });
+    const instructor = await tx.instructor.create({
+      data: { name, brandId, status },
+      include: { brand: { select: { id: true, name: true } } },
+    });
     await tx.user.create({
       data: {
         email,

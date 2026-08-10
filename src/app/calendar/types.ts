@@ -7,7 +7,7 @@ export type ViewMode = "month" | "week" | "day";
 export interface InstructorOption {
   id: number;
   name: string;
-  team: string;
+  brand: string;
   status: "ACTIVE" | "INACTIVE";
 }
 

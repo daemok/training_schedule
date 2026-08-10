@@ -117,7 +117,7 @@ describe("강의 유형 / 강사 관리 권한 (팀장/매니저 전용)", () =>
       makeRequest("http://localhost/api/lecture-types", {
         method: "POST",
         cookie,
-        body: { name: "새 강의 유형", brandId: fx.lectureBrand.id },
+        body: { name: "새 강의 유형" },
       })
     );
     expect(created.status).toBe(201);
@@ -269,7 +269,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
   it("403s creating an instructor as an instructor account", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorA);
     const res = await instructorsPOST(
-      makeRequest(BASE, { method: "POST", cookie, body: { name: "새강사", team: "D팀" } })
+      makeRequest(BASE, { method: "POST", cookie, body: { name: "새강사", brandId: fx.lectureBrand.id } })
     );
     expect(res.status).toBe(403);
   });
@@ -280,7 +280,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", team: "D팀", email: "new-instructor@test.local" },
+        body: { name: "새강사", brandId: fx.lectureBrand.id, email: "new-instructor@test.local" },
       })
     );
     expect(res.status).toBe(201);
@@ -312,7 +312,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", team: "D팀", email: "not-an-email" },
+        body: { name: "새강사", brandId: fx.lectureBrand.id, email: "not-an-email" },
       })
     );
     expect(res.status).toBe(400);
@@ -324,13 +324,13 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", team: "D팀", email: fx.userInstructorA.email },
+        body: { name: "새강사", brandId: fx.lectureBrand.id, email: fx.userInstructorA.email },
       })
     );
     expect(res.status).toBe(409);
   });
 
-  it("400s when name or team is missing", async () => {
+  it("400s when name is missing", async () => {
     const cookie = await sessionCookieFor(fx.userManager);
     const res = await instructorsPOST(
       makeRequest(BASE, { method: "POST", cookie, body: { name: "" } })
@@ -338,20 +338,20 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("allows a manager to edit an instructor's name/team/status", async () => {
+  it("allows a manager to edit an instructor's name/brand/status", async () => {
     const cookie = await sessionCookieFor(fx.userManager);
     const res = await instructorPATCH(
       makeRequest(`${BASE}/${fx.instructorB.id}`, {
         method: "PATCH",
         cookie,
-        body: { name: "박도윤(개명)", team: "C팀", status: "INACTIVE" },
+        body: { name: "박도윤(개명)", brandId: fx.lectureBrand.id, status: "INACTIVE" },
       }),
       { params: Promise.resolve({ id: String(fx.instructorB.id) }) }
     );
     expect(res.status).toBe(200);
     const updated = await res.json();
     expect(updated.name).toBe("박도윤(개명)");
-    expect(updated.team).toBe("C팀");
+    expect(updated.brand.id).toBe(fx.lectureBrand.id);
     expect(updated.status).toBe("INACTIVE");
   });
 
@@ -370,7 +370,9 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
 
   it("deletes an instructor with no schedules, requests, or linked account", async () => {
     const cookie = await sessionCookieFor(fx.userTeamLead);
-    const created = await prisma.instructor.create({ data: { name: "삭제용강사", team: "Z팀" } });
+    const created = await prisma.instructor.create({
+      data: { name: "삭제용강사", brandId: fx.lectureBrand.id },
+    });
 
     const res = await instructorDELETE(
       makeRequest(`${BASE}/${created.id}`, { method: "DELETE", cookie }),
@@ -417,7 +419,9 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
 
   it("403s deleting an instructor as an instructor account", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorA);
-    const created = await prisma.instructor.create({ data: { name: "삭제용강사2", team: "Z팀" } });
+    const created = await prisma.instructor.create({
+      data: { name: "삭제용강사2", brandId: fx.lectureBrand.id },
+    });
     const res = await instructorDELETE(
       makeRequest(`${BASE}/${created.id}`, { method: "DELETE", cookie }),
       { params: Promise.resolve({ id: String(created.id) }) }

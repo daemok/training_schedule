@@ -5,8 +5,14 @@ import { useState, type FormEvent } from "react";
 export interface InstructorOption {
   id: number;
   name: string;
-  team: string;
+  brandId: number;
+  brandName: string;
   status: "ACTIVE" | "INACTIVE";
+}
+
+export interface BrandOption {
+  id: number;
+  name: string;
 }
 
 export type SubmitResult =
@@ -15,19 +21,20 @@ export type SubmitResult =
 
 interface Props {
   initial: InstructorOption | null;
+  brands: BrandOption[];
   onCancel: () => void;
   onSubmit: (payload: {
     name: string;
-    team: string;
+    brandId: number;
     status: "ACTIVE" | "INACTIVE";
     email?: string;
   }) => Promise<SubmitResult>;
 }
 
-/** 강사 등록·수정 모달 (강사 관리 화면, 팀장/매니저 전용). */
-export function InstructorFormModal({ initial, onCancel, onSubmit }: Props) {
+/** 강사 등록·수정 모달 (강사 및 강의 관리 화면, 팀장/매니저 전용). */
+export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [team, setTeam] = useState(initial?.team ?? "");
+  const [brandId, setBrandId] = useState<number | "">(initial?.brandId ?? brands[0]?.id ?? "");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">(initial?.status ?? "ACTIVE");
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +50,8 @@ export function InstructorFormModal({ initial, onCancel, onSubmit }: Props) {
       setError("강사 이름을 입력해주세요.");
       return;
     }
-    if (!team.trim()) {
-      setError("소속 팀을 입력해주세요.");
+    if (!brandId) {
+      setError("브랜드를 선택해주세요.");
       return;
     }
     if (!initial && !email.trim()) {
@@ -55,7 +62,7 @@ export function InstructorFormModal({ initial, onCancel, onSubmit }: Props) {
     setSubmitting(true);
     const result = await onSubmit({
       name: name.trim(),
-      team: team.trim(),
+      brandId,
       status,
       ...(initial ? {} : { email: email.trim() }),
     });
@@ -147,15 +154,20 @@ export function InstructorFormModal({ initial, onCancel, onSubmit }: Props) {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              소속 팀
+              브랜드
             </label>
-            <input
-              type="text"
-              value={team}
-              onChange={(e) => setTeam(e.target.value)}
-              placeholder="예: A팀"
+            <select
+              value={brandId}
+              onChange={(e) => setBrandId(Number(e.target.value))}
               className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
+            >
+              {brands.length === 0 && <option value="">브랜드를 먼저 만들어주세요</option>}
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </div>
           {!initial && (
             <div>

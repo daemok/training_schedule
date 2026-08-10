@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const data: { name?: string; team?: string; status?: (typeof VALID_STATUSES)[number] } = {};
+  const data: { name?: string; brandId?: number; status?: (typeof VALID_STATUSES)[number] } = {};
 
   if (typeof body?.name === "string") {
     const name = body.name.trim();
@@ -27,18 +27,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     data.name = name;
   }
-  if (typeof body?.team === "string") {
-    const team = body.team.trim();
-    if (!team) {
-      return NextResponse.json({ error: "소속 팀을 입력해주세요." }, { status: 400 });
+  if (body?.brandId !== undefined) {
+    const brandId = Number(body.brandId);
+    if (!Number.isInteger(brandId)) {
+      return NextResponse.json({ error: "잘못된 브랜드입니다." }, { status: 400 });
     }
-    data.team = team;
+    const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
+    if (!brand) {
+      return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
+    }
+    data.brandId = brandId;
   }
   if (typeof body?.status === "string" && VALID_STATUSES.includes(body.status as never)) {
     data.status = body.status as (typeof VALID_STATUSES)[number];
   }
 
-  const updated = await prisma.instructor.update({ where: { id }, data }).catch(() => null);
+  const updated = await prisma.instructor
+    .update({ where: { id }, data, include: { brand: { select: { id: true, name: true } } } })
+    .catch(() => null);
   if (!updated) {
     return NextResponse.json({ error: "강사를 찾을 수 없습니다." }, { status: 404 });
   }
