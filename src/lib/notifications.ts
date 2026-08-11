@@ -78,7 +78,7 @@ export async function notifyLectureRequestCreated(params: {
   });
   if (recipients.length === 0) return;
 
-  const message = `${params.instructorName} 강사 앞으로 [${params.lectureTypeName}] 강의 신청이 접수되었습니다 (가신청): ${params.date
+  const message = `${params.instructorName} 강사 앞으로 [${params.lectureTypeName}] 강의 신청이 접수되었습니다 (미확정): ${params.date
     .toISOString()
     .slice(0, 10)} ${TIME_BLOCK_LABEL[params.timeBlock]}. 확정/거절이 필요합니다.`;
 
@@ -99,6 +99,7 @@ export async function notifyLectureRequestResolved(params: {
   date: Date;
   timeBlock: keyof typeof TIME_BLOCK_LABEL;
   confirmed: boolean;
+  rejectionReason?: string;
 }): Promise<void> {
   const message = params.confirmed
     ? `[${params.lectureTypeName}] ${params.instructorName} 강사 강의 신청이 확정되었습니다: ${params.date
@@ -106,7 +107,9 @@ export async function notifyLectureRequestResolved(params: {
         .slice(0, 10)} ${TIME_BLOCK_LABEL[params.timeBlock]}`
     : `[${params.lectureTypeName}] ${params.instructorName} 강사 강의 신청이 거절되었습니다: ${params.date
         .toISOString()
-        .slice(0, 10)} ${TIME_BLOCK_LABEL[params.timeBlock]}`;
+        .slice(0, 10)} ${TIME_BLOCK_LABEL[params.timeBlock]}${
+        params.rejectionReason ? ` (사유: ${params.rejectionReason})` : ""
+      }`;
 
   await prisma.notification.create({
     data: { recipientId: params.requesterUserId, message },

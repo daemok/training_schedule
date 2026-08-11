@@ -26,6 +26,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ScheduleAdminFormModal, AdminScheduleFormPayload, SubmitResult } from "./ScheduleAdminFormModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
+import { RejectReasonModal } from "@/components/RejectReasonModal";
 import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
 
 const TOAST_DURATION_MS = 3000;
@@ -74,6 +75,7 @@ export function CalendarView({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [rejectingSchedule, setRejectingSchedule] = useState<CalendarScheduleDTO | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const isFirstRun = useRef(true);
@@ -325,20 +327,37 @@ export function CalendarView({
     !!selected.lectureRequest &&
     (canManage || (viewerRole === "INSTRUCTOR" && viewerInstructorId === selected.instructorId));
 
-  async function handleLectureRequestDecision(
-    schedule: CalendarScheduleDTO,
-    decision: "confirm" | "reject"
-  ) {
+  async function handleConfirmLectureRequest(schedule: CalendarScheduleDTO) {
     if (!schedule.lectureRequest) return;
     setDecisionSubmitting(true);
-    const res = await fetch(`/api/lecture-requests/${schedule.lectureRequest.id}/${decision}`, {
+    const res = await fetch(`/api/lecture-requests/${schedule.lectureRequest.id}/confirm`, {
       method: "POST",
     });
     setDecisionSubmitting(false);
     if (res.ok) {
       setSelected(null);
       setRefreshKey((k) => k + 1);
-      setToast(decision === "confirm" ? "강의 신청을 확정했습니다." : "강의 신청을 거절했습니다.");
+      setToast("강의 신청을 확정했습니다.");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setToast(data.error ?? "처리에 실패했습니다.");
+  }
+
+  async function handleRejectLectureRequest(reason: string) {
+    if (!rejectingSchedule?.lectureRequest) return;
+    setDecisionSubmitting(true);
+    const res = await fetch(`/api/lecture-requests/${rejectingSchedule.lectureRequest.id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    setDecisionSubmitting(false);
+    if (res.ok) {
+      setRejectingSchedule(null);
+      setSelected(null);
+      setRefreshKey((k) => k + 1);
+      setToast("강의 신청을 거절했습니다.");
       return;
     }
     const data = await res.json().catch(() => ({}));
@@ -511,8 +530,16 @@ export function CalendarView({
           }}
           canDecideLectureRequest={canDecideLectureRequest}
           decisionSubmitting={decisionSubmitting}
-          onConfirmLectureRequest={(schedule) => handleLectureRequestDecision(schedule, "confirm")}
-          onRejectLectureRequest={(schedule) => handleLectureRequestDecision(schedule, "reject")}
+          onConfirmLectureRequest={handleConfirmLectureRequest}
+          onRejectLectureRequest={(schedule) => setRejectingSchedule(schedule)}
+        />
+      )}
+
+      {rejectingSchedule && (
+        <RejectReasonModal
+          submitting={decisionSubmitting}
+          onCancel={() => setRejectingSchedule(null)}
+          onSubmit={handleRejectLectureRequest}
         />
       )}
 

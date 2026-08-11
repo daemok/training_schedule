@@ -8,7 +8,7 @@ import { logout } from "@/app/login/actions";
 import { attachQueuePositions } from "@/lib/lecture-request-queue";
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: "가신청 (확정 대기)",
+  PENDING: "미확정 (확정 대기)",
   CONFIRMED: "확정됨",
   REJECTED: "거절됨",
 };
@@ -84,6 +84,11 @@ export default async function MyLectureRequestsPage() {
                 장소: {r.location} · 참석인원: {r.attendeeCount}명 · FC/LOS: {r.fcLos}
               </div>
               <div className="text-sm text-zinc-600 dark:text-zinc-300">{r.content}</div>
+              {r.status === "REJECTED" && r.rejectionReason && (
+                <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  거절 사유: {r.rejectionReason}
+                </div>
+              )}
             </li>
           ))}
         </ul>

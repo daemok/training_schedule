@@ -330,6 +330,7 @@ export function InstructorManager({
   const visibleBrands = brands.filter((b) => showInactiveBrands || b.isActive);
   const activeBrands: BrandOption[] = brands.filter((b) => b.isActive);
   const visibleLectureTypes = lectureTypes.filter((t) => showInactiveLectureTypes || t.isActive);
+  const activeLectureTypes = lectureTypes.filter((t) => t.isActive);
 
   return (
     <div className="flex flex-col gap-8">
@@ -413,7 +414,7 @@ export function InstructorManager({
                 </button>
               </div>
               <div className="flex flex-wrap gap-4">
-                {lectureTypes.map((t) => (
+                {activeLectureTypes.map((t) => (
                   <label
                     key={t.id}
                     className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200"
@@ -426,7 +427,7 @@ export function InstructorManager({
                     {t.name}
                   </label>
                 ))}
-                {lectureTypes.length === 0 && (
+                {activeLectureTypes.length === 0 && (
                   <p className="text-sm text-zinc-500">먼저 강의 프로그램을 개설해주세요.</p>
                 )}
               </div>

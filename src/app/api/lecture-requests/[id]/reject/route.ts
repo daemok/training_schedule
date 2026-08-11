@@ -6,7 +6,7 @@ import { notifyLectureRequestResolved } from "@/lib/notifications";
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/lecture-requests/[id]/reject — 강의 신청 거절.
+ * POST /api/lecture-requests/[id]/reject — 강의 신청 거절 (body: { reason: string }, 필수).
  * 점유했던 PROVISIONAL 스케줄을 삭제해 해당 시간 슬롯을 다시 연다.
  * 대상 강사 본인 또는 팀장/매니저만 처리할 수 있다.
  */
@@ -20,6 +20,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const id = Number(idParam);
   if (!Number.isInteger(id)) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+  if (!reason) {
+    return NextResponse.json({ error: "거절 사유를 입력해주세요." }, { status: 400 });
   }
 
   const lectureRequest = await prisma.lectureRequest.findUnique({
@@ -44,6 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         confirmedById: actor.userId,
         confirmedAt: new Date(),
         scheduleId: null,
+        rejectionReason: reason,
       },
     }),
     ...(lectureRequest.scheduleId
@@ -59,6 +66,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       date: lectureRequest.date,
       timeBlock: lectureRequest.timeBlock,
       confirmed: false,
+      rejectionReason: reason,
     });
   } catch (err) {
     console.error("Failed to notify requester of rejection:", err);

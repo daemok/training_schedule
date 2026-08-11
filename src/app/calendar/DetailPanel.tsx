@@ -14,7 +14,7 @@ interface Props {
   canManage?: boolean;
   onEdit?: (schedule: CalendarScheduleDTO) => void;
   onDelete?: (schedule: CalendarScheduleDTO) => void;
-  /** true면 이 가신청 건에 대해 확정/거절 버튼을 보여준다(대상 강사 본인 또는 팀장/매니저). */
+  /** true면 이 미확정 건에 대해 확정/거절 버튼을 보여준다(대상 강사 본인 또는 팀장/매니저). */
   canDecideLectureRequest?: boolean;
   onConfirmLectureRequest?: (schedule: CalendarScheduleDTO) => void;
   onRejectLectureRequest?: (schedule: CalendarScheduleDTO) => void;
@@ -54,7 +54,7 @@ export function DetailPanel({
             </span>
             {schedule.status === "PROVISIONAL" && (
               <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                가신청
+                미확정
               </span>
             )}
           </div>

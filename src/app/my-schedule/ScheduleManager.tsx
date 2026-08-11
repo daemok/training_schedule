@@ -271,7 +271,7 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
                         </span>
                         {s.status === "PROVISIONAL" && (
                           <span className="rounded bg-rose-100 px-2 py-0.5 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                            가신청
+                            미확정
                           </span>
                         )}
                       </div>

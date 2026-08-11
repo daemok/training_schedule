@@ -241,12 +241,30 @@ describe("POST /api/lecture-requests/[id]/confirm and /reject", () => {
     expect(res.status).toBe(403);
   });
 
+  it("400s rejecting without a reason", async () => {
+    const created = await createPendingRequest();
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+
+    const res = await rejectPOST(
+      makeRequest(`${BASE}/${created.id}/reject`, { method: "POST", cookie, body: { reason: "  " } }),
+      { params: Promise.resolve({ id: String(created.id) }) }
+    );
+    expect(res.status).toBe(400);
+
+    const request = await prisma.lectureRequest.findUnique({ where: { id: created.id } });
+    expect(request?.status).toBe("PENDING");
+  });
+
   it("allows a team lead to reject, deleting the provisional schedule and freeing the slot", async () => {
     const created = await createPendingRequest();
     const cookie = await sessionCookieFor(fx.userTeamLead);
 
     const res = await rejectPOST(
-      makeRequest(`${BASE}/${created.id}/reject`, { method: "POST", cookie }),
+      makeRequest(`${BASE}/${created.id}/reject`, {
+        method: "POST",
+        cookie,
+        body: { reason: "시간대가 이미 다른 일정과 겹칩니다." },
+      }),
       { params: Promise.resolve({ id: String(created.id) }) }
     );
     expect(res.status).toBe(200);
@@ -254,6 +272,7 @@ describe("POST /api/lecture-requests/[id]/confirm and /reject", () => {
     const request = await prisma.lectureRequest.findUnique({ where: { id: created.id } });
     expect(request?.status).toBe("REJECTED");
     expect(request?.scheduleId).toBeNull();
+    expect(request?.rejectionReason).toBe("시간대가 이미 다른 일정과 겹칩니다.");
     const schedule = await prisma.schedule.findUnique({ where: { id: created.scheduleId } });
     expect(schedule).toBeNull();
 

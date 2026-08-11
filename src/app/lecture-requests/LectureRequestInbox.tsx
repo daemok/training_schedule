@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TIME_BLOCK_LABEL } from "@/lib/schedule-labels";
 import { Toast } from "@/components/Toast";
+import { RejectReasonModal } from "@/components/RejectReasonModal";
 
 interface PendingRequest {
   id: number;
@@ -26,6 +27,7 @@ const TOAST_DURATION_MS = 3000;
 export function LectureRequestInbox({ initialRequests }: { initialRequests: PendingRequest[] }) {
   const [requests, setRequests] = useState(initialRequests);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -34,14 +36,35 @@ export function LectureRequestInbox({ initialRequests }: { initialRequests: Pend
     setTimeout(() => setToast(null), TOAST_DURATION_MS);
   }
 
-  async function handleDecision(id: number, decision: "confirm" | "reject") {
+  async function handleConfirm(id: number) {
     setProcessingId(id);
     setError(null);
-    const res = await fetch(`/api/lecture-requests/${id}/${decision}`, { method: "POST" });
+    const res = await fetch(`/api/lecture-requests/${id}/confirm`, { method: "POST" });
     setProcessingId(null);
     if (res.ok) {
       setRequests((prev) => prev.filter((r) => r.id !== id));
-      showToast(decision === "confirm" ? "강의 신청을 확정했습니다." : "강의 신청을 거절했습니다.");
+      showToast("강의 신청을 확정했습니다.");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "처리에 실패했습니다.");
+  }
+
+  async function handleReject(reason: string) {
+    if (!rejectingId) return;
+    const id = rejectingId;
+    setProcessingId(id);
+    setError(null);
+    const res = await fetch(`/api/lecture-requests/${id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    setProcessingId(null);
+    if (res.ok) {
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      setRejectingId(null);
+      showToast("강의 신청을 거절했습니다.");
       return;
     }
     const data = await res.json().catch(() => ({}));
@@ -75,7 +98,7 @@ export function LectureRequestInbox({ initialRequests }: { initialRequests: Pend
                   {r.lectureTypeName} · {r.instructorName} 강사
                 </span>
                 <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                  가신청
+                  미확정
                 </span>
               </div>
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -89,14 +112,14 @@ export function LectureRequestInbox({ initialRequests }: { initialRequests: Pend
 
               <div className="mt-2 flex justify-end gap-2">
                 <button
-                  onClick={() => handleDecision(r.id, "reject")}
+                  onClick={() => setRejectingId(r.id)}
                   disabled={processingId === r.id}
                   className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm hover:border-black disabled:opacity-50 dark:border-zinc-700 dark:hover:border-zinc-50"
                 >
                   거절
                 </button>
                 <button
-                  onClick={() => handleDecision(r.id, "confirm")}
+                  onClick={() => handleConfirm(r.id)}
                   disabled={processingId === r.id}
                   className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-50 dark:text-black"
                 >
@@ -106,6 +129,14 @@ export function LectureRequestInbox({ initialRequests }: { initialRequests: Pend
             </li>
           ))}
         </ul>
+      )}
+
+      {rejectingId && (
+        <RejectReasonModal
+          submitting={processingId === rejectingId}
+          onCancel={() => setRejectingId(null)}
+          onSubmit={handleReject}
+        />
       )}
 
       {toast && <Toast message={toast} />}

@@ -30,7 +30,7 @@ export function EventPill({ schedule, orderedInstructorIds, showInstructor, onSe
       </span>
       {schedule.status === "PROVISIONAL" && (
         <span className="shrink-0 rounded bg-rose-100 px-1 py-px text-[10px] font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-          가신청
+          미확정
         </span>
       )}
       {showInstructor && (

@@ -188,7 +188,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
     if (res.ok) {
       setRequestTarget(null);
       setRefreshKey((k) => k + 1);
-      setToast("강의 신청이 접수되었습니다. 확정 전까지는 '가신청' 상태입니다.");
+      setToast("강의 신청이 접수되었습니다. 확정 전까지는 '미확정' 상태입니다.");
       return { ok: true };
     }
     const data = await res.json().catch(() => ({}));
