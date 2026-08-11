@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { maskSchedulesForViewer, ViewerContext } from "@/lib/access-control";
 import { formatDateOnly } from "@/lib/date";
-import { attachQueuePositions } from "@/lib/lecture-request-queue";
+import { attachDailyPriority } from "@/lib/lecture-request-queue";
 import type { TimeBlock, ScheduleType } from "@/lib/schedule-labels";
 import type { ScheduleStatus } from "@/generated/prisma";
 
@@ -13,8 +13,12 @@ export interface MaskedScheduleLectureRequest {
   fcLos: string;
   attendeeCount: number;
   content: string;
-  /** 같은 날짜+시간대에 접수된 순서(1, 2, 3...) — src/lib/lecture-request-queue.ts와 동일한 규칙. */
-  queuePosition: number;
+  /**
+   * 그 날짜(오전/오후/저녁 구분 없이 전체)의 아직 처리되지 않은(PENDING) 요청들 사이에서
+   * 몇 번째로 접수됐는지(1, 2, 3...) — src/lib/lecture-request-queue.ts의 attachDailyPriority와
+   * 동일한 규칙. 이미 확정/거절된 요청이면 null.
+   */
+  dailyPriority: number | null;
 }
 
 export interface MaskedScheduleRow {
@@ -66,8 +70,8 @@ export async function fetchMaskedSchedules(params: {
   const lectureRequestRows = masked
     .map((s) => s.lectureRequest)
     .filter((lr): lr is NonNullable<typeof lr> => lr !== null);
-  const withPositions = await attachQueuePositions(lectureRequestRows);
-  const positionById = new Map(withPositions.map((r) => [r.id, r.queuePosition]));
+  const withPriority = await attachDailyPriority(lectureRequestRows);
+  const priorityById = new Map(withPriority.map((r) => [r.id, r.dailyPriority]));
 
   return masked.map((s) => ({
     id: s.id,
@@ -91,7 +95,7 @@ export async function fetchMaskedSchedules(params: {
           fcLos: s.lectureRequest.fcLos,
           attendeeCount: s.lectureRequest.attendeeCount,
           content: s.lectureRequest.content,
-          queuePosition: positionById.get(s.lectureRequest.id) ?? 1,
+          dailyPriority: priorityById.get(s.lectureRequest.id) ?? null,
         }
       : null,
   }));

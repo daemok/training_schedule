@@ -21,8 +21,8 @@ export interface CalendarScheduleLectureRequest {
   fcLos: string;
   attendeeCount: number;
   content: string;
-  /** 같은 날짜+시간대에 접수된 순서(1, 2, 3...). */
-  queuePosition: number;
+  /** 그 날짜의 아직 처리되지 않은(PENDING) 요청들 사이의 순위(1, 2, 3...). 처리 완료면 null. */
+  dailyPriority: number | null;
 }
 
 export interface CalendarScheduleDTO {

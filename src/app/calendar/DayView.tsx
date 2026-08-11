@@ -87,6 +87,14 @@ export function DayView({
                               미확정
                             </span>
                           )}
+                          {s.lectureRequest?.dailyPriority != null && (
+                            <span
+                              className="rounded-full bg-zinc-900 px-1.5 py-0.5 font-semibold text-white dark:bg-zinc-50 dark:text-black"
+                              title="그 날짜의 미확정 요청 중 접수 순서"
+                            >
+                              {s.lectureRequest.dailyPriority}번째
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {showInstructor && (

@@ -57,9 +57,9 @@ export function DetailPanel({
                 미확정
               </span>
             )}
-            {schedule.lectureRequest && (
+            {schedule.lectureRequest?.dailyPriority != null && (
               <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white dark:bg-zinc-50 dark:text-black">
-                {schedule.lectureRequest.queuePosition}번째
+                {schedule.lectureRequest.dailyPriority}번째
               </span>
             )}
           </div>

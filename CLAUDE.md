@@ -233,17 +233,27 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
   gets the request detail (FC/LOS, attendee count, content, requester) via `fetchMaskedSchedules`'s
   `lectureRequest` join (`src/lib/schedule-query.ts`), not a second fetch. `src/app/apply/my/` is
   the requester's own status list.
-- **Queue position**: because venue capacity means not every simultaneous request for a given
-  date+block can be accommodated, every `LectureRequest` returned by `scope=mine`/`scope=pending`
-  (and the two server-rendered pages that duplicate that query, `/lecture-requests` and
-  `/apply/my`) carries a `queuePosition` — its 1-based rank by `createdAt` among *all* requests
-  (any status, any instructor) sharing that exact `date`+`timeBlock`, computed by
-  `attachQueuePositions` (`src/lib/lecture-request-queue.ts`). No region/location dimension is
-  factored in — deliberately scoped to date+block only, per explicit product decision.
-  `fetchMaskedSchedules` (`src/lib/schedule-query.ts`) attaches the same `queuePosition` onto
-  `MaskedScheduleLectureRequest`/`CalendarScheduleLectureRequest` too, so `DetailPanel.tsx` can
-  show it as a "N번째" badge next to the "미확정" tag on `/calendar` and `/my-schedule` — the one
-  read path `attachQueuePositions` wasn't already wired into before this.
+- **Queue position vs. daily priority** (`src/lib/lecture-request-queue.ts`) — two distinct,
+  deliberately different rankings, both 1-based by `createdAt`, do not conflate them:
+  - `attachQueuePositions` → `queuePosition`: rank among *all* requests (any status, any
+    instructor) sharing the exact `date`+`timeBlock` — used on `/lecture-requests` and
+    `/apply/my` (via `scope=mine`/`scope=pending`) to show which requests are competing for the
+    *same slot*, since venue capacity means not all of them can be accommodated. No region/
+    location dimension is factored in — deliberately scoped to date+block only, per explicit
+    product decision. Rejected requests still occupy a number (historical record of arrival
+    order), so a later-arriving still-PENDING request doesn't get renumbered down to 1.
+  - `attachDailyPriority` → `dailyPriority: number | null`: rank among only-still-`PENDING`
+    requests for a given `date`, ignoring `timeBlock` entirely (오전/오후/저녁 share one
+    sequence) — `null` once a request is confirmed/rejected (removed from the ranking pool
+    entirely, not just hidden, so remaining PENDING requests re-tighten toward 1 rather than
+    leaving gaps). This is what `fetchMaskedSchedules` (`src/lib/schedule-query.ts`) attaches to
+    `MaskedScheduleLectureRequest`/`CalendarScheduleLectureRequest`, and what `/calendar` and
+    `/my-schedule` render: `DetailPanel.tsx` shows it as a "N번째" badge next to "미확정",
+    `EventPill.tsx` shows a small numbered circle to the left of the 오전/오후/저녁 time-block
+    badge, and `DayView.tsx` (which lays out its own per-block groups instead of using
+    `EventPill`) shows the same badge inline per event. Purpose: a team lead/manager scanning a
+    single day's calendar can see, across every block, which still-undecided request arrived
+    first — a different question from "who's competing for this specific slot."
 
 ### Key directories
 

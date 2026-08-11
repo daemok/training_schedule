@@ -101,3 +101,95 @@ describe("GET /api/schedules", () => {
     expect(data[0].title).toBe("A 강사의 8월 강의");
   });
 });
+
+describe("dailyPriority (캘린더에 표시되는 미확정 요청 우선순위)", () => {
+  async function createPendingLectureSchedule(opts: {
+    instructorId: number;
+    timeBlock: "MORNING" | "AFTERNOON" | "EVENING";
+    startTime: string;
+    endTime: string;
+    createdAt: Date;
+  }) {
+    const schedule = await prisma.schedule.create({
+      data: {
+        instructorId: opts.instructorId,
+        date: new Date("2026-08-10T00:00:00.000Z"),
+        timeBlock: opts.timeBlock,
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        scheduleType: "LECTURE",
+        status: "PROVISIONAL",
+        title: "테스트 강의 신청",
+      },
+    });
+    await prisma.lectureRequest.create({
+      data: {
+        requesterId: fx.userGeneral.id,
+        instructorId: opts.instructorId,
+        lectureTypeId: fx.lectureType.id,
+        date: new Date("2026-08-10T00:00:00.000Z"),
+        timeBlock: opts.timeBlock,
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        fcLos: "FC-1",
+        location: "본사",
+        attendeeCount: 1,
+        content: "테스트",
+        scheduleId: schedule.id,
+        createdAt: opts.createdAt,
+      },
+    });
+    return schedule;
+  }
+
+  it("ranks pending requests by creation order across the whole date, not per time block", async () => {
+    // 저녁 신청이 먼저, 오전 신청이 나중 — 블록이 달라도 날짜 전체 기준으로 1, 2가 매겨져야 한다.
+    const eveningSchedule = await createPendingLectureSchedule({
+      instructorId: fx.instructorA.id,
+      timeBlock: "EVENING",
+      startTime: "18:00",
+      endTime: "19:00",
+      createdAt: new Date("2026-08-01T09:00:00.000Z"),
+    });
+    const morningSchedule = await createPendingLectureSchedule({
+      instructorId: fx.instructorB.id,
+      timeBlock: "MORNING",
+      startTime: "09:00",
+      endTime: "10:00",
+      createdAt: new Date("2026-08-01T10:00:00.000Z"),
+    });
+
+    const cookie = await sessionCookieFor(fx.userManager);
+    const res = await GET(
+      makeRequest(`${BASE}?from=2026-08-01&to=2026-09-01&instructor=ALL`, { method: "GET", cookie })
+    );
+    const data = await res.json();
+    const evening = data.find((d: { id: number }) => d.id === eveningSchedule.id);
+    const morning = data.find((d: { id: number }) => d.id === morningSchedule.id);
+    expect(evening.lectureRequest.dailyPriority).toBe(1);
+    expect(morning.lectureRequest.dailyPriority).toBe(2);
+  });
+
+  it("returns null dailyPriority once a request is confirmed", async () => {
+    const schedule = await createPendingLectureSchedule({
+      instructorId: fx.instructorA.id,
+      timeBlock: "MORNING",
+      startTime: "09:00",
+      endTime: "10:00",
+      createdAt: new Date("2026-08-01T09:00:00.000Z"),
+    });
+    await prisma.schedule.update({ where: { id: schedule.id }, data: { status: "CONFIRMED" } });
+    await prisma.lectureRequest.updateMany({
+      where: { scheduleId: schedule.id },
+      data: { status: "CONFIRMED" },
+    });
+
+    const cookie = await sessionCookieFor(fx.userManager);
+    const res = await GET(
+      makeRequest(`${BASE}?from=2026-08-01&to=2026-09-01&instructor=ALL`, { method: "GET", cookie })
+    );
+    const data = await res.json();
+    const row = data.find((d: { id: number }) => d.id === schedule.id);
+    expect(row.lectureRequest.dailyPriority).toBeNull();
+  });
+});

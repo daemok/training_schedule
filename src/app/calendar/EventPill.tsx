@@ -23,6 +23,14 @@ export function EventPill({ schedule, orderedInstructorIds, showInstructor, onSe
       title={`${schedule.instructorName} · ${schedule.title} (${timeLabel})`}
       className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] hover:bg-zinc-100 dark:hover:bg-zinc-800"
     >
+      {schedule.lectureRequest?.dailyPriority != null && (
+        <span
+          className="shrink-0 rounded-full bg-zinc-900 px-1 py-px text-[10px] font-semibold text-white dark:bg-zinc-50 dark:text-black"
+          title="그 날짜의 미확정 요청 중 접수 순서"
+        >
+          {schedule.lectureRequest.dailyPriority}
+        </span>
+      )}
       <span
         className={`shrink-0 rounded px-1 py-px text-[10px] font-medium ${TIME_BLOCK_BADGE_CLASS[schedule.timeBlock]}`}
       >
