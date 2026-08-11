@@ -57,6 +57,11 @@ export function DetailPanel({
                 미확정
               </span>
             )}
+            {schedule.lectureRequest && (
+              <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white dark:bg-zinc-50 dark:text-black">
+                {schedule.lectureRequest.queuePosition}번째
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -126,7 +131,7 @@ export function DetailPanel({
                 </dd>
               </div>
               <div>
-                <dt className="text-zinc-500 dark:text-zinc-400">요청 강의 내용</dt>
+                <dt className="text-zinc-500 dark:text-zinc-400">강의 요청 목적</dt>
                 <dd className="mt-0.5 text-black dark:text-zinc-50">{schedule.lectureRequest.content}</dd>
               </div>
             </>

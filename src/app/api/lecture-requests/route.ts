@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "참석 인원을 올바르게 입력해주세요." }, { status: 400 });
   }
   if (!content) {
-    return NextResponse.json({ error: "요청 강의 내용을 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "강의 요청 목적을 입력해주세요." }, { status: 400 });
   }
 
   const instructor = await prisma.instructor.findUnique({ where: { id: instructorId } });

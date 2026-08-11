@@ -21,6 +21,8 @@ export interface CalendarScheduleLectureRequest {
   fcLos: string;
   attendeeCount: number;
   content: string;
+  /** 같은 날짜+시간대에 접수된 순서(1, 2, 3...). */
+  queuePosition: number;
 }
 
 export interface CalendarScheduleDTO {

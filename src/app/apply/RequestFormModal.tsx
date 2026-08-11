@@ -84,7 +84,7 @@ export function RequestFormModal({
     if (!location.trim()) return "장소를 입력해주세요.";
     const count = Number(attendeeCount);
     if (!Number.isInteger(count) || count <= 0) return "참석 인원을 올바르게 입력해주세요.";
-    if (!content.trim()) return "요청 강의 내용을 입력해주세요.";
+    if (!content.trim()) return "강의 요청 목적을 입력해주세요.";
     return null;
   }
 
@@ -203,7 +203,7 @@ export function RequestFormModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              요청 강의 내용
+              강의 요청 목적
             </label>
             <textarea
               value={content}

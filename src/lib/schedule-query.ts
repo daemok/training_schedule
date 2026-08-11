@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { maskSchedulesForViewer, ViewerContext } from "@/lib/access-control";
 import { formatDateOnly } from "@/lib/date";
+import { attachQueuePositions } from "@/lib/lecture-request-queue";
 import type { TimeBlock, ScheduleType } from "@/lib/schedule-labels";
 import type { ScheduleStatus } from "@/generated/prisma";
 
@@ -12,6 +13,8 @@ export interface MaskedScheduleLectureRequest {
   fcLos: string;
   attendeeCount: number;
   content: string;
+  /** 같은 날짜+시간대에 접수된 순서(1, 2, 3...) — src/lib/lecture-request-queue.ts와 동일한 규칙. */
+  queuePosition: number;
 }
 
 export interface MaskedScheduleRow {
@@ -27,8 +30,9 @@ export interface MaskedScheduleRow {
   memo: string | null;
   instructorId: number;
   instructorName: string;
-  // PROVISIONAL(가신청) 상태의 LECTURE 스케줄에만 채워진다 — 캘린더에서 가신청 항목을
-  // 클릭했을 때 상세 내용(FC/LOS, 참석인원, 요청 내용 등)과 확정/거절 버튼을 보여주기 위함.
+  // PROVISIONAL(미확정) 상태의 LECTURE 스케줄에만 채워진다 — 캘린더에서 미확정 항목을
+  // 클릭했을 때 상세 내용(FC/LOS, 참석인원, 요청 내용, 접수 순서 등)과 확정/거절 버튼을
+  // 보여주기 위함.
   lectureRequest: MaskedScheduleLectureRequest | null;
 }
 
@@ -59,6 +63,12 @@ export async function fetchMaskedSchedules(params: {
 
   const masked = maskSchedulesForViewer(schedules, params.viewer);
 
+  const lectureRequestRows = masked
+    .map((s) => s.lectureRequest)
+    .filter((lr): lr is NonNullable<typeof lr> => lr !== null);
+  const withPositions = await attachQueuePositions(lectureRequestRows);
+  const positionById = new Map(withPositions.map((r) => [r.id, r.queuePosition]));
+
   return masked.map((s) => ({
     id: s.id,
     date: formatDateOnly(s.date),
@@ -81,6 +91,7 @@ export async function fetchMaskedSchedules(params: {
           fcLos: s.lectureRequest.fcLos,
           attendeeCount: s.lectureRequest.attendeeCount,
           content: s.lectureRequest.content,
+          queuePosition: positionById.get(s.lectureRequest.id) ?? 1,
         }
       : null,
   }));

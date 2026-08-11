@@ -240,6 +240,10 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
   (any status, any instructor) sharing that exact `date`+`timeBlock`, computed by
   `attachQueuePositions` (`src/lib/lecture-request-queue.ts`). No region/location dimension is
   factored in — deliberately scoped to date+block only, per explicit product decision.
+  `fetchMaskedSchedules` (`src/lib/schedule-query.ts`) attaches the same `queuePosition` onto
+  `MaskedScheduleLectureRequest`/`CalendarScheduleLectureRequest` too, so `DetailPanel.tsx` can
+  show it as a "N번째" badge next to the "미확정" tag on `/calendar` and `/my-schedule` — the one
+  read path `attachQueuePositions` wasn't already wired into before this.
 
 ### Key directories
 
