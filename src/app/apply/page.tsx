@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
 import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { ApplyViewSwitcher } from "./ApplyViewSwitcher";
+import { MonthlyAnnouncementBox } from "./MonthlyAnnouncementBox";
 
 export default async function ApplyPage() {
   const user = await getCurrentUser();
@@ -18,23 +19,27 @@ export default async function ApplyPage() {
   // 신청 가능 기간은 일반 사용자에게만 적용된다 — 팀장/매니저는 기간과 무관하게 모든 강의를
   // 볼 수 있다(상급자 예외, src/app/api/lecture-requests/route.ts와 동일한 규칙).
   const today = toDateOnly(formatDateOnly(new Date()));
-  const lectureTypes = await prisma.lectureType.findMany({
-    where: {
-      isActive: true,
-      ...(user.role === "GENERAL"
-        ? {
-            AND: [
-              { OR: [{ applicationStartDate: null }, { applicationStartDate: { lte: today } }] },
-              { OR: [{ applicationEndDate: null }, { applicationEndDate: { gte: today } }] },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { name: "asc" },
-  });
+  const [lectureTypes, announcement] = await Promise.all([
+    prisma.lectureType.findMany({
+      where: {
+        isActive: true,
+        ...(user.role === "GENERAL"
+          ? {
+              AND: [
+                { OR: [{ applicationStartDate: null }, { applicationStartDate: { lte: today } }] },
+                { OR: [{ applicationEndDate: null }, { applicationEndDate: { gte: today } }] },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.monthlyAnnouncement.findFirst(),
+  ]);
+  const canManageAnnouncement = user.role === "TEAM_LEAD" || user.role === "MANAGER";
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <Link href="/" className="text-sm text-zinc-500 hover:underline">
@@ -60,7 +65,13 @@ export default async function ApplyPage() {
         </div>
       </div>
 
-      <ApplyViewSwitcher lectureTypes={lectureTypes} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+        <MonthlyAnnouncementBox
+          initialContent={announcement?.content ?? ""}
+          canManage={canManageAnnouncement}
+        />
+        <ApplyViewSwitcher lectureTypes={lectureTypes} />
+      </div>
     </div>
   );
 }

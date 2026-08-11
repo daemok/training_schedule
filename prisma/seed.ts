@@ -22,6 +22,7 @@ function d(day: number) {
 
 async function main() {
   await prisma.loginAttempt.deleteMany();
+  await prisma.monthlyAnnouncement.deleteMany();
   await prisma.requestLock.deleteMany();
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();

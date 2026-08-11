@@ -10,6 +10,7 @@ export const TEST_PASSWORD = "test-password-123";
  */
 export async function resetDb() {
   await prisma.loginAttempt.deleteMany();
+  await prisma.monthlyAnnouncement.deleteMany();
   await prisma.requestLock.deleteMany();
   await prisma.lectureRequest.deleteMany();
   await prisma.instructorLectureType.deleteMany();

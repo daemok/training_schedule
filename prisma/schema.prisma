@@ -304,3 +304,16 @@ model LoginAttempt {
   @@index([email, createdAt])
   @@map("login_attempts")
 }
+
+// "이달의 교육 프로그램 안내" — 강의 신청(/apply) 화면 왼쪽에 노출되는 텍스트 공지(최대
+// 1000자). 싱글턴으로 관리한다 — 항상 최대 한 행만 존재하며, src/app/api/monthly-announcement/
+// route.ts가 기존 행이 있으면 갱신, 없으면 생성하는 방식(upsert)으로 다룬다. 팀장/매니저만
+// 등록·수정할 수 있고, 로그인한 모든 역할이 조회할 수 있다.
+model MonthlyAnnouncement {
+  id        Int      @id @default(autoincrement()) @map("announcement_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("monthly_announcements")
+}

@@ -219,15 +219,20 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
 - Confirm/reject (`/api/lecture-requests/[id]/confirm|reject`) reuse `resolveScheduleActor` +
   `canManageSchedule` — only the target instructor or TEAM_LEAD/MANAGER can resolve a request.
   Confirm flips the `Schedule.status` to `CONFIRMED` in place; reject **deletes** the provisional
-  `Schedule` row (freeing the slot) and nulls `LectureRequest.scheduleId`. These same two endpoints
-  are called from two places: the dedicated `src/app/lecture-requests/` inbox (instructor sees
-  only their own pending requests; TEAM_LEAD/MANAGER see all) **and** directly from the calendar's
-  `DetailPanel` (`src/app/calendar/DetailPanel.tsx`) when a `PROVISIONAL` `LECTURE` schedule pill
-  is clicked on `/calendar` or `/my-schedule` — `canDecideLectureRequest` there is computed
-  client-side from `canManageSchedule`-equivalent logic (TEAM_LEAD/MANAGER, or the owning
-  instructor). The panel gets the request detail (FC/LOS, attendee count, content, requester) via
-  `fetchMaskedSchedules`'s `lectureRequest` join (`src/lib/schedule-query.ts`), not a second fetch.
-  `src/app/apply/my/` is the requester's own status list.
+  `Schedule` row (freeing the slot), nulls `LectureRequest.scheduleId`, and requires a non-empty
+  `reason` in the request body (400 without one) stored on `LectureRequest.rejectionReason` —
+  surfaced in the requester's notification and on `/apply/my`. The "가신청" status label was renamed
+  to "미확정" everywhere it's shown (calendar badges, toasts, notifications). These same two
+  endpoints are called from three places: the dedicated `src/app/lecture-requests/` inbox
+  (instructor sees only their own pending requests; TEAM_LEAD/MANAGER see all), directly from the
+  calendar's `DetailPanel` (`src/app/calendar/DetailPanel.tsx`) when a `PROVISIONAL` `LECTURE`
+  schedule pill is clicked on `/calendar` or `/my-schedule`, and `/my-schedule`'s own calendar view
+  — all three collect the reject reason through the shared `src/components/RejectReasonModal.tsx`
+  before calling the API. `canDecideLectureRequest` there is computed client-side from
+  `canManageSchedule`-equivalent logic (TEAM_LEAD/MANAGER, or the owning instructor). The panel
+  gets the request detail (FC/LOS, attendee count, content, requester) via `fetchMaskedSchedules`'s
+  `lectureRequest` join (`src/lib/schedule-query.ts`), not a second fetch. `src/app/apply/my/` is
+  the requester's own status list.
 - **Queue position**: because venue capacity means not every simultaneous request for a given
   date+block can be accommodated, every `LectureRequest` returned by `scope=mine`/`scope=pending`
   (and the two server-rendered pages that duplicate that query, `/lecture-requests` and
@@ -270,13 +275,18 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
 - `src/app/admin/` — TEAM_LEAD/MANAGER only (guarded in `src/proxy.ts`): `page.tsx` is the
   dashboard hub, `instructors/` (page title "강사 및 강의 관리") is the instructor/brand/lecture-
   program manager (`InstructorManager.tsx` — sections in order: 강사 list+CRUD, 강사별 강의
-  프로그램 배정 immediately below it, 브랜드 (soft-delete/restore), 강의 프로그램 with inline
-  edit for name/description/application dates), `signups/` is the approval queue, `users/` is
+  프로그램 배정 immediately below it — active lecture programs only, matching the filter already
+  applied to the 강의 프로그램 list itself — 브랜드 (soft-delete/restore), 강의 프로그램 with
+  inline edit for name/description/application dates), `signups/` is the approval queue, `users/` is
   account management (see "Roles & permissions" above — MANAGER-only, the one exception to
   TEAM_LEAD/MANAGER parity).
 - `src/app/apply/`, `src/app/signup/` — lecture request flow (open to `GENERAL`, `TEAM_LEAD`, and
   `MANAGER` — guarded per-page since `/apply` isn't gated in `src/proxy.ts`) and public signup
-  (still `GENERAL`-only).
+  (still `GENERAL`-only). `/apply`'s left column renders `MonthlyAnnouncementBox.tsx` — a free-text
+  "이달의 교육 프로그램 안내" (max 1000 chars) backed by the singleton `MonthlyAnnouncement` table
+  and `GET/PATCH /api/monthly-announcement` (`GET` open to any logged-in role, `PATCH` TEAM_LEAD/
+  MANAGER only; the route upserts against `findFirst()` since there's no natural unique key for the
+  single row).
 - `src/lib/schedule-labels.ts` — single source of truth for `TimeBlock`/`ScheduleType` labels and
   `TIME_BLOCK_RANGE` (lecture-request time validation only).
 - `src/generated/prisma/` — Prisma client output (non-default path, not `node_modules/.prisma`);
