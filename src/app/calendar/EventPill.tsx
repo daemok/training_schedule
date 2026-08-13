@@ -2,15 +2,24 @@
 
 import { CalendarScheduleDTO, TIME_BLOCK_BADGE_CLASS, TIME_BLOCK_LABEL } from "./types";
 import { instructorColorVars } from "./colors";
+import { TIME_BLOCK_BADGE_CLASS_GRAY } from "@/lib/korean-holidays";
 
 interface Props {
   schedule: CalendarScheduleDTO;
   orderedInstructorIds: number[];
   showInstructor: boolean;
+  /** 주말/공휴일(대체공휴일 포함)이면 시간대 배지를 진한 회색으로 표시한다. */
+  isGrayDay?: boolean;
   onSelect: (schedule: CalendarScheduleDTO) => void;
 }
 
-export function EventPill({ schedule, orderedInstructorIds, showInstructor, onSelect }: Props) {
+export function EventPill({
+  schedule,
+  orderedInstructorIds,
+  showInstructor,
+  isGrayDay,
+  onSelect,
+}: Props) {
   const timeLabel =
     schedule.startTime && schedule.endTime ? `${schedule.startTime}~${schedule.endTime}` : "종일";
 
@@ -32,7 +41,9 @@ export function EventPill({ schedule, orderedInstructorIds, showInstructor, onSe
         </span>
       )}
       <span
-        className={`shrink-0 rounded px-1 py-px text-[10px] font-medium ${TIME_BLOCK_BADGE_CLASS[schedule.timeBlock]}`}
+        className={`shrink-0 rounded px-1 py-px text-[10px] font-medium ${
+          isGrayDay ? TIME_BLOCK_BADGE_CLASS_GRAY : TIME_BLOCK_BADGE_CLASS[schedule.timeBlock]
+        }`}
       >
         {TIME_BLOCK_LABEL[schedule.timeBlock]}
       </span>

@@ -6,6 +6,8 @@ import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
 import type { CalendarScheduleDTO, TimeBlock, ViewMode } from "@/app/calendar/types";
 import { VIEW_MODE_LABEL } from "@/app/calendar/types";
 import {
+  buildMonthGridDays,
+  buildWeekDays,
   formatDayTitle,
   formatMonthTitle,
   formatWeekTitle,
@@ -16,6 +18,7 @@ import { MonthGrid } from "@/app/calendar/MonthGrid";
 import { WeekView } from "@/app/calendar/WeekView";
 import { DayView } from "@/app/calendar/DayView";
 import { DetailPanel } from "@/app/calendar/DetailPanel";
+import { useKoreanHolidays } from "@/lib/korean-holidays";
 import { ScheduleFormModal, ScheduleFormPayload, SubmitResult } from "./ScheduleFormModal";
 import { BulkPersonalScheduleModal, BulkSchedulePayload } from "./BulkPersonalScheduleModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
@@ -71,6 +74,11 @@ export function ScheduleCalendarView({ instructorId }: Props) {
 
   const anchor = toDateOnly(anchorDateStr);
   const today = formatDateOnly(new Date());
+
+  const gridDates =
+    view === "month" ? buildMonthGridDays(anchor) : view === "week" ? buildWeekDays(anchor) : [anchor];
+  const holidayYears = Array.from(new Set(gridDates.map((d) => d.getUTCFullYear())));
+  const holidays = useKoreanHolidays(holidayYears);
 
   useEffect(() => {
     if (!toast) return;
@@ -385,6 +393,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           schedules={schedules}
           orderedInstructorIds={[instructorId]}
           showInstructor={false}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={(date) => openCreateAt(date)}
         />
@@ -396,6 +405,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           schedules={schedules}
           orderedInstructorIds={[instructorId]}
           showInstructor={false}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={openCreateAt}
         />
@@ -406,6 +416,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           schedules={schedules}
           orderedInstructorIds={[instructorId]}
           showInstructor={false}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={openCreateAt}
         />

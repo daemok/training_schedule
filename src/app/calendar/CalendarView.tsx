@@ -12,6 +12,8 @@ import {
   VIEW_MODE_LABEL,
 } from "./types";
 import {
+  buildMonthGridDays,
+  buildWeekDays,
   formatDayTitle,
   formatMonthTitle,
   formatWeekTitle,
@@ -28,6 +30,7 @@ import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { RejectReasonModal } from "@/components/RejectReasonModal";
 import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
+import { useKoreanHolidays } from "@/lib/korean-holidays";
 
 const TOAST_DURATION_MS = 3000;
 
@@ -82,6 +85,11 @@ export function CalendarView({
   const anchor = toDateOnly(anchorDateStr);
   const today = formatDateOnly(new Date());
   const orderedInstructorIds = instructors.map((i) => i.id);
+
+  const gridDates =
+    view === "month" ? buildMonthGridDays(anchor) : view === "week" ? buildWeekDays(anchor) : [anchor];
+  const holidayYears = Array.from(new Set(gridDates.map((d) => d.getUTCFullYear())));
+  const holidays = useKoreanHolidays(holidayYears);
 
   useEffect(() => {
     if (!toast) return;
@@ -492,6 +500,7 @@ export function CalendarView({
           schedules={schedules}
           orderedInstructorIds={orderedInstructorIds}
           showInstructor={showInstructorBadge}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={emptyClickEnabled ? (date) => openCreateAt(date) : undefined}
         />
@@ -503,6 +512,7 @@ export function CalendarView({
           schedules={schedules}
           orderedInstructorIds={orderedInstructorIds}
           showInstructor={showInstructorBadge}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={emptyClickEnabled ? openCreateAt : undefined}
         />
@@ -513,6 +523,7 @@ export function CalendarView({
           schedules={schedules}
           orderedInstructorIds={orderedInstructorIds}
           showInstructor={showInstructorBadge}
+          holidays={holidays}
           onSelect={setSelected}
           onSelectEmpty={emptyClickEnabled ? openCreateAt : undefined}
         />

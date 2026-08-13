@@ -274,6 +274,15 @@ it exists purely to serialize concurrent access to `RequestFormModal` for the sa
   `src/lib/schedule-all-day.ts` (`submitAllDayPersonalSchedule`) fans a "종일" (all-day) personal
   entry out into 3 separate MORNING/AFTERNOON/EVENING rows client-side, with rollback-on-partial-
   failure — there is no "ALL_DAY" enum value, each block is still an independent `Schedule` row.
+  `src/lib/korean-holidays.ts` (`useKoreanHolidays`, client-only, wraps the `@hyunbinseo/holidays-kr`
+  npm package which ships official-gazette-sourced KR holiday data incl. 대체공휴일 for 2018–2027)
+  grays out Saturday/Sunday/holiday cells and swaps the 오전/오후/저녁 badge to
+  `TIME_BLOCK_BADGE_CLASS_GRAY` in `MonthGrid.tsx`/`WeekView.tsx`/`DayView.tsx`/`EventPill.tsx`.
+  Both `CalendarView.tsx` and `ScheduleCalendarView.tsx` (below) independently call the hook with
+  the years spanned by the *rendered* grid (not just the fetched date range — a month view's
+  padding days can belong to the adjacent year), since view/date navigation here is client-only
+  state with no server round-trip to recompute it for them. Years outside the package's supported
+  range fail silently (no crash, just no graying) since this is a cosmetic feature.
 - `src/app/my-schedule/` — instructor-only self-service CRUD, list or calendar sub-view
   (`ScheduleViewSwitcher.tsx` / `ScheduleCalendarView.tsx`, reuses the `calendar/` grid components).
   `BulkPersonalScheduleModal.tsx` (opened from either sub-view via "+ 개인일정 일괄 등록") lets an

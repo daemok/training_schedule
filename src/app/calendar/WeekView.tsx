@@ -4,6 +4,7 @@ import { CalendarScheduleDTO, TimeBlock, TIME_BLOCK_LABEL } from "./types";
 import { buildWeekDays, weekdayLabel } from "./date-utils";
 import { formatDateOnly } from "@/lib/date";
 import { EventPill } from "./EventPill";
+import { isGrayCalendarDate, type HolidayMap } from "@/lib/korean-holidays";
 
 const TIME_BLOCKS: TimeBlock[] = ["MORNING", "AFTERNOON", "EVENING"];
 
@@ -13,6 +14,7 @@ interface Props {
   schedules: CalendarScheduleDTO[];
   orderedInstructorIds: number[];
   showInstructor: boolean;
+  holidays?: HolidayMap;
   onSelect: (schedule: CalendarScheduleDTO) => void;
   /** 지정되면 빈 셀 클릭 시 (date, timeBlock)으로 새 일정 등록을 시작할 수 있다. */
   onSelectEmpty?: (date: string, timeBlock: TimeBlock) => void;
@@ -24,6 +26,7 @@ export function WeekView({
   schedules,
   orderedInstructorIds,
   showInstructor,
+  holidays = {},
   onSelect,
   onSelectEmpty,
 }: Props) {
@@ -48,14 +51,13 @@ export function WeekView({
             {days.map((d) => {
               const dateStr = formatDateOnly(d);
               const isToday = dateStr === today;
+              const isGrayDay = isGrayCalendarDate(dateStr, holidays);
               return (
                 <th
                   key={dateStr}
                   className={`border-r border-zinc-200 p-2 text-xs font-medium dark:border-zinc-800 ${
-                    isToday
-                      ? "text-black dark:text-zinc-50"
-                      : "text-zinc-500 dark:text-zinc-400"
-                  }`}
+                    isGrayDay ? "bg-zinc-200 dark:bg-zinc-800" : ""
+                  } ${isToday ? "text-black dark:text-zinc-50" : "text-zinc-500 dark:text-zinc-400"}`}
                 >
                   {d.getUTCMonth() + 1}/{d.getUTCDate()} ({weekdayLabel(d)})
                 </th>
@@ -72,6 +74,7 @@ export function WeekView({
               {days.map((d) => {
                 const dateStr = formatDateOnly(d);
                 const events = byDateAndBlock.get(`${dateStr}__${block}`) ?? [];
+                const isGrayDay = isGrayCalendarDate(dateStr, holidays);
                 return (
                   <td
                     key={dateStr}
@@ -81,8 +84,12 @@ export function WeekView({
                         : undefined
                     }
                     className={`min-h-[72px] border-r border-zinc-200 p-1 align-top dark:border-zinc-800 ${
+                      isGrayDay ? "bg-zinc-200 dark:bg-zinc-800" : ""
+                    } ${
                       events.length === 0 && onSelectEmpty
-                        ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                        ? isGrayDay
+                          ? "cursor-pointer hover:bg-zinc-300 dark:hover:bg-zinc-700"
+                          : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900"
                         : ""
                     }`}
                   >
@@ -93,6 +100,7 @@ export function WeekView({
                           schedule={s}
                           orderedInstructorIds={orderedInstructorIds}
                           showInstructor={showInstructor}
+                          isGrayDay={isGrayDay}
                           onSelect={onSelect}
                         />
                       ))}

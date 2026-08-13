@@ -4,6 +4,7 @@ import { CalendarScheduleDTO } from "./types";
 import { buildMonthGridDays } from "./date-utils";
 import { formatDateOnly } from "@/lib/date";
 import { EventPill } from "./EventPill";
+import { isGrayCalendarDate, type HolidayMap } from "@/lib/korean-holidays";
 
 const WEEKDAY_HEADERS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -13,6 +14,7 @@ interface Props {
   schedules: CalendarScheduleDTO[];
   orderedInstructorIds: number[];
   showInstructor: boolean;
+  holidays?: HolidayMap;
   onSelect: (schedule: CalendarScheduleDTO) => void;
   /** 지정되면 날짜 칸의 빈 영역 클릭 시 해당 날짜로 새 일정 등록을 시작할 수 있다(블록은 폼에서 선택). */
   onSelectEmpty?: (date: string) => void;
@@ -24,6 +26,7 @@ export function MonthGrid({
   schedules,
   orderedInstructorIds,
   showInstructor,
+  holidays = {},
   onSelect,
   onSelectEmpty,
 }: Props) {
@@ -53,14 +56,19 @@ export function MonthGrid({
             const inMonth = d.getUTCMonth() === currentMonth;
             const isToday = dateStr === today;
             const dayEvents = byDate.get(dateStr) ?? [];
+            const isGrayDay = isGrayCalendarDate(dateStr, holidays);
 
             return (
               <div
                 key={dateStr}
                 onClick={onSelectEmpty ? () => onSelectEmpty(dateStr) : undefined}
                 className={`min-h-[104px] border-b border-r border-zinc-200 p-1.5 dark:border-zinc-800 ${
-                  inMonth ? "" : "bg-zinc-50/60 dark:bg-zinc-950/40"
-                } ${onSelectEmpty ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900" : ""}`}
+                  isGrayDay
+                    ? `bg-zinc-200 dark:bg-zinc-800 ${onSelectEmpty ? "hover:bg-zinc-300 dark:hover:bg-zinc-700" : ""}`
+                    : `${inMonth ? "" : "bg-zinc-50/60 dark:bg-zinc-950/40"} ${
+                        onSelectEmpty ? "hover:bg-zinc-50 dark:hover:bg-zinc-900" : ""
+                      }`
+                } ${onSelectEmpty ? "cursor-pointer" : ""}`}
               >
                 <div
                   className={`mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${
@@ -80,6 +88,7 @@ export function MonthGrid({
                       schedule={s}
                       orderedInstructorIds={orderedInstructorIds}
                       showInstructor={showInstructor}
+                      isGrayDay={isGrayDay}
                       onSelect={onSelect}
                     />
                   ))}

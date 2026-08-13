@@ -8,6 +8,7 @@ import {
   SCHEDULE_TYPE_LABEL,
 } from "./types";
 import { instructorColorVars } from "./colors";
+import { isGrayCalendarDate, TIME_BLOCK_BADGE_CLASS_GRAY, type HolidayMap } from "@/lib/korean-holidays";
 
 const TIME_BLOCKS: TimeBlock[] = ["MORNING", "AFTERNOON", "EVENING"];
 
@@ -16,6 +17,7 @@ interface Props {
   schedules: CalendarScheduleDTO[];
   orderedInstructorIds: number[];
   showInstructor: boolean;
+  holidays?: HolidayMap;
   onSelect: (schedule: CalendarScheduleDTO) => void;
   /** 지정되면 빈 블록도 렌더링되며 클릭 시 (date, timeBlock)으로 새 일정 등록을 시작할 수 있다. */
   onSelectEmpty?: (date: string, timeBlock: TimeBlock) => void;
@@ -26,9 +28,11 @@ export function DayView({
   schedules,
   orderedInstructorIds,
   showInstructor,
+  holidays = {},
   onSelect,
   onSelectEmpty,
 }: Props) {
+  const isGrayDay = isGrayCalendarDate(date, holidays);
   const byBlock = new Map<TimeBlock, CalendarScheduleDTO[]>();
   for (const s of schedules) {
     const list = byBlock.get(s.timeBlock) ?? [];
@@ -55,7 +59,9 @@ export function DayView({
             className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
           >
             <div
-              className={`border-b border-zinc-200 px-4 py-2 text-sm font-medium dark:border-zinc-800 ${TIME_BLOCK_BADGE_CLASS[block]}`}
+              className={`border-b border-zinc-200 px-4 py-2 text-sm font-medium dark:border-zinc-800 ${
+                isGrayDay ? TIME_BLOCK_BADGE_CLASS_GRAY : TIME_BLOCK_BADGE_CLASS[block]
+              }`}
             >
               {TIME_BLOCK_LABEL[block]}
             </div>
