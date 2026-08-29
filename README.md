@@ -432,14 +432,15 @@ Vercel Postgres 등)를 쓰고 싶다면 3번의 `DATABASE_URL`만 해당 제공
 
    `TEST_DATABASE_URL`은 로컬 테스트 전용이므로 Vercel에는 설정할 필요가 없습니다.
 
-4. **마이그레이션 적용**: Vercel은 빌드 시 `next build`만 실행하므로, 배포 전(또는
-   최초 1회) 로컬에서 운영 DB를 대상으로 마이그레이션과 시드를 직접 실행합니다.
+4. **마이그레이션 적용**: `package.json`의 `build` 스크립트가 `prisma migrate deploy &&
+   next build`로 되어 있어, Vercel이 매 배포마다 빌드 전에 운영 DB(`DATABASE_URL`)를
+   대상으로 대기 중인 마이그레이션을 자동 적용합니다 — `DATABASE_URL`을 "sensitive"로
+   설정해 CLI/대시보드에서 값을 다시 읽을 수 없게 해도 빌드 프로세스에는 실제 값이
+   주입되므로 정상 동작합니다. 시드(`npm run db:seed`)는 자동화 대상이 아니므로(운영
+   데이터를 실수로 지우는 사고를 막기 위해) 최초 1회만 직접 실행합니다:
    ```bash
-   DATABASE_URL="<운영 DB 연결 문자열>" npx prisma migrate deploy
    DATABASE_URL="<운영 DB 연결 문자열>" npm run db:seed   # 최초 1회만 — 이미 데이터가 있다면 생략
    ```
-   (원한다면 `package.json`의 `build` 스크립트를 `prisma migrate deploy && next build`로
-   바꿔 배포 파이프라인에 포함시킬 수도 있습니다.)
 
 5. **Deploy** 클릭 — 이후 `main` 브랜치에 푸시할 때마다 자동 배포됩니다.
 
