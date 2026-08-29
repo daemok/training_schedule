@@ -269,7 +269,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
   it("403s creating an instructor as an instructor account", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorA);
     const res = await instructorsPOST(
-      makeRequest(BASE, { method: "POST", cookie, body: { name: "새강사", brandId: fx.lectureBrand.id } })
+      makeRequest(BASE, { method: "POST", cookie, body: { name: "새강사", brandIds: [fx.lectureBrand.id] } })
     );
     expect(res.status).toBe(403);
   });
@@ -280,7 +280,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", brandId: fx.lectureBrand.id, email: "new-instructor@test.local" },
+        body: { name: "새강사", brandIds: [fx.lectureBrand.id], email: "new-instructor@test.local" },
       })
     );
     expect(res.status).toBe(201);
@@ -312,7 +312,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", brandId: fx.lectureBrand.id, email: "not-an-email" },
+        body: { name: "새강사", brandIds: [fx.lectureBrand.id], email: "not-an-email" },
       })
     );
     expect(res.status).toBe(400);
@@ -324,7 +324,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(BASE, {
         method: "POST",
         cookie,
-        body: { name: "새강사", brandId: fx.lectureBrand.id, email: fx.userInstructorA.email },
+        body: { name: "새강사", brandIds: [fx.lectureBrand.id], email: fx.userInstructorA.email },
       })
     );
     expect(res.status).toBe(409);
@@ -344,14 +344,14 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
       makeRequest(`${BASE}/${fx.instructorB.id}`, {
         method: "PATCH",
         cookie,
-        body: { name: "박도윤(개명)", brandId: fx.lectureBrand.id, status: "INACTIVE" },
+        body: { name: "박도윤(개명)", brandIds: [fx.lectureBrand.id], status: "INACTIVE" },
       }),
       { params: Promise.resolve({ id: String(fx.instructorB.id) }) }
     );
     expect(res.status).toBe(200);
     const updated = await res.json();
     expect(updated.name).toBe("박도윤(개명)");
-    expect(updated.brand.id).toBe(fx.lectureBrand.id);
+    expect(updated.brands.map((b: { id: number }) => b.id)).toEqual([fx.lectureBrand.id]);
     expect(updated.status).toBe("INACTIVE");
   });
 
@@ -371,7 +371,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
   it("deletes an instructor with no schedules, requests, or linked account", async () => {
     const cookie = await sessionCookieFor(fx.userTeamLead);
     const created = await prisma.instructor.create({
-      data: { name: "삭제용강사", brandId: fx.lectureBrand.id },
+      data: { name: "삭제용강사", brands: { create: [{ brandId: fx.lectureBrand.id }] } },
     });
 
     const res = await instructorDELETE(
@@ -420,7 +420,7 @@ describe("강사 관리 (팀장/매니저 전용)", () => {
   it("403s deleting an instructor as an instructor account", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorA);
     const created = await prisma.instructor.create({
-      data: { name: "삭제용강사2", brandId: fx.lectureBrand.id },
+      data: { name: "삭제용강사2", brands: { create: [{ brandId: fx.lectureBrand.id }] } },
     });
     const res = await instructorDELETE(
       makeRequest(`${BASE}/${created.id}`, { method: "DELETE", cookie }),

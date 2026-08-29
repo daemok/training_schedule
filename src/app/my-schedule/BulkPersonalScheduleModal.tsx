@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { buildMonthGridDays, formatMonthTitle, shiftAnchor } from "@/app/calendar/date-utils";
+import {
+  buildMonthGridDays,
+  formatMonthTitle,
+  shiftAnchor,
+  nextMonthAnchor,
+} from "@/app/calendar/date-utils";
 import { formatDateOnly } from "@/lib/date";
 import { MAX_BULK_PERSONAL_DATES, type BulkConflictInfo, type BulkSubmitResult } from "@/lib/schedule-bulk";
 import type { PersonalBlockChoice } from "./personal-block";
@@ -21,14 +26,10 @@ interface Props {
 const WEEKDAY_HEADERS = ["일", "월", "화", "수", "목", "금", "토"];
 const PERSONAL_BLOCK_CHOICES: PersonalBlockChoice[] = ["ALL_DAY", "MORNING", "AFTERNOON", "EVENING"];
 
-function currentMonthAnchor(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-}
-
 /** 강사 본인의 개인일정을 여러 날짜에 한 번에 등록하는 모달(최대 MAX_BULK_PERSONAL_DATES개). */
 export function BulkPersonalScheduleModal({ onCancel, onSubmit }: Props) {
-  const [anchor, setAnchor] = useState(currentMonthAnchor);
+  // 최초 진입 시에는 다음 달을 기본으로 보여준다.
+  const [anchor, setAnchor] = useState(() => nextMonthAnchor());
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [personalBlock, setPersonalBlock] = useState<PersonalBlockChoice>("ALL_DAY");
   const [title, setTitle] = useState("");

@@ -39,3 +39,48 @@ export async function submitBulkPersonalSchedule(params: {
     conflicts: data.conflicts,
   };
 }
+
+export type BulkEditResult =
+  | { ok: true; updatedCount: number }
+  | { ok: false; error: string; overlap?: boolean; conflicts?: BulkConflictInfo[] };
+
+export type BulkDeleteResult = { ok: true; deletedCount: number } | { ok: false; error: string };
+
+/** 선택한 여러 개인일정에 동일한 새 사유/장소/시간대를 한 번에 적용한다(강사 본인 전용). */
+export async function submitBulkPersonalEdit(params: {
+  ids: number[];
+  title?: string;
+  location?: string;
+  personalBlock?: TimeBlock;
+  force: boolean;
+}): Promise<BulkEditResult> {
+  const res = await fetch("/api/my/schedules/bulk", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok) {
+    return { ok: true, updatedCount: data.updatedCount };
+  }
+  return {
+    ok: false,
+    error: data.error ?? "수정에 실패했습니다.",
+    overlap: data.overlap,
+    conflicts: data.conflicts,
+  };
+}
+
+/** 선택한 여러 개인일정을 한 번에 삭제한다(강사 본인 전용). */
+export async function submitBulkPersonalDelete(ids: number[]): Promise<BulkDeleteResult> {
+  const res = await fetch("/api/my/schedules/bulk", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok) {
+    return { ok: true, deletedCount: data.deletedCount };
+  }
+  return { ok: false, error: data.error ?? "삭제에 실패했습니다." };
+}

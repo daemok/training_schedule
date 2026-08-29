@@ -31,6 +31,7 @@ async function main() {
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.instructorLectureBrand.deleteMany();
   await prisma.instructor.deleteMany();
   await prisma.lectureBrand.deleteMany();
 
@@ -41,19 +42,40 @@ async function main() {
 
   const instructors = await Promise.all([
     prisma.instructor.create({
-      data: { name: "김민준", brandId: nutrilite.id, status: InstructorStatus.ACTIVE },
+      data: {
+        name: "김민준",
+        status: InstructorStatus.ACTIVE,
+        brands: { create: [{ brandId: nutrilite.id }] },
+      },
     }),
     prisma.instructor.create({
-      data: { name: "이서연", brandId: nutrilite.id, status: InstructorStatus.ACTIVE },
+      data: {
+        name: "이서연",
+        status: InstructorStatus.ACTIVE,
+        brands: { create: [{ brandId: nutrilite.id }] },
+      },
     }),
     prisma.instructor.create({
-      data: { name: "박도윤", brandId: artistry.id, status: InstructorStatus.ACTIVE },
+      data: {
+        name: "박도윤",
+        status: InstructorStatus.ACTIVE,
+        brands: { create: [{ brandId: artistry.id }] },
+      },
     }),
     prisma.instructor.create({
-      data: { name: "최지우", brandId: artistry.id, status: InstructorStatus.INACTIVE },
+      data: {
+        name: "최지우",
+        status: InstructorStatus.INACTIVE,
+        brands: { create: [{ brandId: artistry.id }] },
+      },
     }),
     prisma.instructor.create({
-      data: { name: "정하은", brandId: artistry.id, status: InstructorStatus.ACTIVE },
+      data: {
+        name: "정하은",
+        status: InstructorStatus.ACTIVE,
+        // 브랜드 2개 이상 배정 데모 — 다중 선택 UI 확인용.
+        brands: { create: [{ brandId: nutrilite.id }, { brandId: artistry.id }] },
+      },
     }),
   ]);
 

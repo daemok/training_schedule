@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           id: true,
           name: true,
           status: true,
-          brand: { select: { name: true } },
+          brands: { include: { brand: { select: { name: true } } } },
         },
       },
     },
@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       id: l.instructor.id,
       name: l.instructor.name,
       status: l.instructor.status,
-      brand: l.instructor.brand.name,
+      brand: l.instructor.brands.map((b) => b.brand.name).join(", "),
     }))
   );
 }

@@ -10,9 +10,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function GET() {
   const instructors = await prisma.instructor.findMany({
     orderBy: { name: "asc" },
-    include: { brand: { select: { id: true, name: true } } },
+    include: { brands: { include: { brand: { select: { id: true, name: true } } } } },
   });
-  return NextResponse.json(instructors);
+  return NextResponse.json(
+    instructors.map((i) => ({ ...i, brands: i.brands.map((b) => b.brand) }))
+  );
 }
 
 /**
@@ -36,12 +38,17 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return NextResponse.json({ error: "강사 이름을 입력해주세요." }, { status: 400 });
   }
-  const brandId = Number(body?.brandId);
-  if (!Number.isInteger(brandId)) {
-    return NextResponse.json({ error: "브랜드를 선택해주세요." }, { status: 400 });
+  const brandIds = Array.isArray(body?.brandIds)
+    ? (body.brandIds as unknown[]).map((v) => Number(v))
+    : [];
+  if (brandIds.length === 0 || !brandIds.every((id) => Number.isInteger(id))) {
+    return NextResponse.json({ error: "브랜드를 1개 이상 선택해주세요." }, { status: 400 });
   }
-  const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
-  if (!brand) {
+  const uniqueBrandIds = Array.from(new Set(brandIds));
+  const foundBrands = await prisma.lectureBrand.findMany({
+    where: { id: { in: uniqueBrandIds } },
+  });
+  if (foundBrands.length !== uniqueBrandIds.length) {
     return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
   }
   if (!email || !EMAIL_RE.test(email)) {
@@ -61,8 +68,12 @@ export async function POST(request: NextRequest) {
 
   const created = await prisma.$transaction(async (tx) => {
     const instructor = await tx.instructor.create({
-      data: { name, brandId, status },
-      include: { brand: { select: { id: true, name: true } } },
+      data: {
+        name,
+        status,
+        brands: { create: uniqueBrandIds.map((brandId) => ({ brandId })) },
+      },
+      include: { brands: { include: { brand: { select: { id: true, name: true } } } } },
     });
     await tx.user.create({
       data: {
@@ -76,5 +87,8 @@ export async function POST(request: NextRequest) {
     return instructor;
   });
 
-  return NextResponse.json({ ...created, email, temporaryPassword }, { status: 201 });
+  return NextResponse.json(
+    { ...created, brands: created.brands.map((b) => b.brand), email, temporaryPassword },
+    { status: 201 }
+  );
 }

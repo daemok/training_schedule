@@ -2,12 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { toDateOnly, formatDateOnly } from "@/lib/date";
-import { fetchMaskedSchedules } from "@/lib/schedule-query";
-import { getViewRange, nextMonthAnchor } from "./date-utils";
-import { CalendarView } from "./CalendarView";
+import { formatDateOnly, toDateOnly } from "@/lib/date";
+import { fetchPublicLectureSchedules } from "@/lib/schedule-query";
+import { getViewRange, nextMonthAnchor } from "@/app/calendar/date-utils";
 import { logout } from "@/app/login/actions";
-import type { InstructorOption, ViewMode } from "./types";
+import { PublicCalendarView } from "./PublicCalendarView";
+import type { InstructorOption, ViewMode } from "@/app/calendar/types";
 
 type SearchParams = Promise<{
   view?: string;
@@ -18,15 +18,19 @@ type SearchParams = Promise<{
 const VALID_VIEWS: ViewMode[] = ["month", "week", "day"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export default async function CalendarPage({
+/**
+ * 공용 캘린더 — 확정된 강의만 오전/오후/저녁 + 강의유형 + 강사명으로 보여주는, 로그인한
+ * 모든 역할(GENERAL 포함)이 열람 가능한 화면. 개인일정/미확정 건은 애초에 조회되지 않고,
+ * 등록/수정/삭제 같은 관리 기능도 없다(순수 조회 전용) — src/app/calendar/(운영 캘린더)와
+ * 달리 GENERAL이 proxy.ts에서 차단되지 않는다.
+ */
+export default async function PublicCalendarPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
 
-  // 뷰어의 역할/본인 강사 id는 반드시 서버가 검증한 세션에서만 가져온다.
-  // (클라이언트가 role/viewerId 쿼리 파라미터로 다른 역할·강사를 사칭할 수 없어야 한다)
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
@@ -35,8 +39,7 @@ export default async function CalendarPage({
   const view: ViewMode = VALID_VIEWS.includes(params.view as ViewMode)
     ? (params.view as ViewMode)
     : "month";
-  // ?date= 파라미터가 없으면 다음 달을 기본으로 보여준다(사용자가 "오늘" 버튼으로 실제
-  // 오늘이 속한 달로 돌아갈 수 있다).
+  // ?date= 파라미터가 없으면 다음 달을 기본으로 보여준다.
   const dateStr =
     params.date && DATE_RE.test(params.date) ? params.date : formatDateOnly(nextMonthAnchor());
   const instructorFilter =
@@ -47,30 +50,16 @@ export default async function CalendarPage({
   const instructorId = instructorFilter !== "ALL" ? Number(instructorFilter) : undefined;
 
   const [instructors, initialSchedules] = await Promise.all([
-    prisma.instructor.findMany({
-      orderBy: { id: "asc" },
-      include: { brands: { include: { brand: { select: { name: true } } } } },
-    }),
-    fetchMaskedSchedules({
-      from: start,
-      to: end,
-      instructorId,
-      viewer: { role: user.role, instructorId: user.instructorId ?? undefined },
-    }),
+    prisma.instructor.findMany({ orderBy: { id: "asc" } }),
+    fetchPublicLectureSchedules({ from: start, to: end, instructorId }),
   ]);
 
   const instructorOptions: InstructorOption[] = instructors.map((i) => ({
     id: i.id,
     name: i.name,
-    brand: i.brands.map((b) => b.brand.name).join(", "),
+    brand: "",
     status: i.status,
   }));
-
-  const ROLE_LABEL: Record<string, string> = {
-    INSTRUCTOR: "강사",
-    TEAM_LEAD: "팀장",
-    MANAGER: "매니저",
-  };
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
@@ -80,12 +69,11 @@ export default async function CalendarPage({
             ← 홈으로
           </Link>
           <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
-            전체 스케줄 캘린더
+            확정 강의 캘린더
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {user.email} · {ROLE_LABEL[user.role]}로 로그인됨 — &quot;전체 강사&quot; 선택 시
-            강사별로 색상이 구분되며, 개인일정 상세는 본인 또는 팀장/매니저만 열람할 수
-            있습니다. 팀장/매니저는 모든 강사의 일정을 등록·수정·삭제할 수 있습니다.
+            {user.email}님 — 확정된 강의만 오전/오후/저녁 시간대, 강의유형, 강사명으로
+            표시됩니다.
           </p>
         </div>
         <form action={logout}>
@@ -98,13 +86,11 @@ export default async function CalendarPage({
         </form>
       </div>
 
-      <CalendarView
+      <PublicCalendarView
         instructors={instructorOptions}
         initialView={view}
         initialDate={dateStr}
         initialInstructorFilter={instructorFilter}
-        viewerRole={user.role}
-        viewerInstructorId={user.instructorId}
         initialSchedules={initialSchedules}
       />
     </div>

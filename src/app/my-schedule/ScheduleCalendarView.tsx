@@ -13,6 +13,7 @@ import {
   formatWeekTitle,
   getViewRange,
   shiftAnchor,
+  nextMonthAnchor,
 } from "@/app/calendar/date-utils";
 import { MonthGrid } from "@/app/calendar/MonthGrid";
 import { WeekView } from "@/app/calendar/WeekView";
@@ -21,10 +22,18 @@ import { DetailPanel } from "@/app/calendar/DetailPanel";
 import { useKoreanHolidays } from "@/lib/korean-holidays";
 import { ScheduleFormModal, ScheduleFormPayload, SubmitResult } from "./ScheduleFormModal";
 import { BulkPersonalScheduleModal, BulkSchedulePayload } from "./BulkPersonalScheduleModal";
+import { BulkPersonalManageModal, BulkEditPayload } from "./BulkPersonalManageModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { RejectReasonModal } from "@/components/RejectReasonModal";
-import { submitBulkPersonalSchedule, type BulkSubmitResult } from "@/lib/schedule-bulk";
+import {
+  submitBulkPersonalSchedule,
+  submitBulkPersonalDelete,
+  submitBulkPersonalEdit,
+  type BulkSubmitResult,
+  type BulkEditResult,
+  type BulkDeleteResult,
+} from "@/lib/schedule-bulk";
 import type { ScheduleDTO } from "./types";
 
 const TOAST_DURATION_MS = 3000;
@@ -52,7 +61,8 @@ function toScheduleDTO(s: CalendarScheduleDTO): ScheduleDTO {
 /** 강사 본인 스케줄의 캘린더형 화면. /calendar의 월/주/일 뷰 컴포넌트를 그대로 재사용한다. */
 export function ScheduleCalendarView({ instructorId }: Props) {
   const [view, setView] = useState<ViewMode>("month");
-  const [anchorDateStr, setAnchorDateStr] = useState(formatDateOnly(new Date()));
+  // 최초 진입 시에는 다음 달을 기본으로 보여준다("오늘" 버튼은 실제 오늘로 이동).
+  const [anchorDateStr, setAnchorDateStr] = useState(() => formatDateOnly(nextMonthAnchor()));
   const [schedules, setSchedules] = useState<CalendarScheduleDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +72,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleDTO | null>(null);
   const [bulkFormOpen, setBulkFormOpen] = useState(false);
+  const [bulkManageOpen, setBulkManageOpen] = useState(false);
   const [createPreset, setCreatePreset] = useState<{ date?: string; timeBlock?: TimeBlock } | null>(
     null
   );
@@ -172,6 +183,22 @@ export function ScheduleCalendarView({ instructorId }: Props) {
       title: payload.title,
       force,
     });
+    if (result.ok) {
+      setRefreshKey((k) => k + 1);
+    }
+    return result;
+  }
+
+  async function handleBulkDelete(ids: number[]): Promise<BulkDeleteResult> {
+    const result = await submitBulkPersonalDelete(ids);
+    if (result.ok) {
+      setRefreshKey((k) => k + 1);
+    }
+    return result;
+  }
+
+  async function handleBulkEdit(payload: BulkEditPayload, force: boolean): Promise<BulkEditResult> {
+    const result = await submitBulkPersonalEdit({ ...payload, force });
     if (result.ok) {
       setRefreshKey((k) => k + 1);
     }
@@ -341,7 +368,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           >
             다음 →
           </button>
-          <span className="ml-2 text-lg font-medium text-black dark:text-zinc-50">{title}</span>
+          <span className="ml-2 text-xl font-semibold text-black dark:text-zinc-50">{title}</span>
           {loading && <span className="text-xs text-zinc-400">불러오는 중...</span>}
         </div>
 
@@ -366,6 +393,12 @@ export function ScheduleCalendarView({ instructorId }: Props) {
             className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
           >
             + 개인일정 일괄 등록
+          </button>
+          <button
+            onClick={() => setBulkManageOpen(true)}
+            className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
+          >
+            일정 일괄 관리
           </button>
           <button
             onClick={openCreate}
@@ -463,6 +496,14 @@ export function ScheduleCalendarView({ instructorId }: Props) {
 
       {bulkFormOpen && (
         <BulkPersonalScheduleModal onCancel={closeBulk} onSubmit={handleBulkSubmit} />
+      )}
+
+      {bulkManageOpen && (
+        <BulkPersonalManageModal
+          onCancel={() => setBulkManageOpen(false)}
+          onDeleteSubmit={handleBulkDelete}
+          onEditSubmit={handleBulkEdit}
+        />
       )}
 
       {deleting && (

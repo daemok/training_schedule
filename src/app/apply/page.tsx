@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { logout } from "@/app/login/actions";
-import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { ApplyViewSwitcher } from "./ApplyViewSwitcher";
 import { MonthlyAnnouncementBox } from "./MonthlyAnnouncementBox";
 
@@ -18,7 +17,7 @@ export default async function ApplyPage() {
 
   // 신청 가능 기간은 일반 사용자에게만 적용된다 — 팀장/매니저는 기간과 무관하게 모든 강의를
   // 볼 수 있다(상급자 예외, src/app/api/lecture-requests/route.ts와 동일한 규칙).
-  const today = toDateOnly(formatDateOnly(new Date()));
+  const now = new Date();
   const [lectureTypes, announcement] = await Promise.all([
     prisma.lectureType.findMany({
       where: {
@@ -26,8 +25,8 @@ export default async function ApplyPage() {
         ...(user.role === "GENERAL"
           ? {
               AND: [
-                { OR: [{ applicationStartDate: null }, { applicationStartDate: { lte: today } }] },
-                { OR: [{ applicationEndDate: null }, { applicationEndDate: { gte: today } }] },
+                { OR: [{ applicationStartDate: null }, { applicationStartDate: { lte: now } }] },
+                { OR: [{ applicationEndDate: null }, { applicationEndDate: { gte: now } }] },
               ],
             }
           : {}),
@@ -53,6 +52,9 @@ export default async function ApplyPage() {
         <div className="flex items-center gap-4">
           <Link href="/apply/my" className="text-sm text-zinc-500 hover:underline">
             내 신청 내역
+          </Link>
+          <Link href="/public-calendar" className="text-sm text-zinc-500 hover:underline">
+            확정 강의 캘린더
           </Link>
           <form action={logout}>
             <button

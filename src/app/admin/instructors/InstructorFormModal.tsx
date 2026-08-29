@@ -5,8 +5,7 @@ import { useState, type FormEvent } from "react";
 export interface InstructorOption {
   id: number;
   name: string;
-  brandId: number;
-  brandName: string;
+  brands: { id: number; name: string }[];
   status: "ACTIVE" | "INACTIVE";
 }
 
@@ -25,7 +24,7 @@ interface Props {
   onCancel: () => void;
   onSubmit: (payload: {
     name: string;
-    brandId: number;
+    brandIds: number[];
     status: "ACTIVE" | "INACTIVE";
     email?: string;
   }) => Promise<SubmitResult>;
@@ -34,7 +33,9 @@ interface Props {
 /** 강사 등록·수정 모달 (강사 및 강의 관리 화면, 팀장/매니저 전용). */
 export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [brandId, setBrandId] = useState<number | "">(initial?.brandId ?? brands[0]?.id ?? "");
+  const [brandIds, setBrandIds] = useState<number[]>(
+    initial?.brands.map((b) => b.id) ?? []
+  );
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">(initial?.status ?? "ACTIVE");
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +51,8 @@ export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Pro
       setError("강사 이름을 입력해주세요.");
       return;
     }
-    if (!brandId) {
-      setError("브랜드를 선택해주세요.");
+    if (brandIds.length === 0) {
+      setError("브랜드를 1개 이상 선택해주세요.");
       return;
     }
     if (!initial && !email.trim()) {
@@ -62,7 +63,7 @@ export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Pro
     setSubmitting(true);
     const result = await onSubmit({
       name: name.trim(),
-      brandId,
+      brandIds,
       status,
       ...(initial ? {} : { email: email.trim() }),
     });
@@ -153,21 +154,34 @@ export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Pro
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              브랜드
-            </label>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(Number(e.target.value))}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            >
-              {brands.length === 0 && <option value="">브랜드를 먼저 만들어주세요</option>}
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            <span className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              브랜드 (1개 이상 선택)
+            </span>
+            {brands.length === 0 ? (
+              <p className="text-sm text-zinc-500">브랜드를 먼저 만들어주세요.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5 rounded-md border border-zinc-300 p-3 dark:border-zinc-700">
+                {brands.map((b) => (
+                  <label
+                    key={b.id}
+                    className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={brandIds.includes(b.id)}
+                      onChange={() =>
+                        setBrandIds((prev) =>
+                          prev.includes(b.id)
+                            ? prev.filter((id) => id !== b.id)
+                            : [...prev, b.id]
+                        )
+                      }
+                    />
+                    {b.name}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
           {!initial && (
             <div>

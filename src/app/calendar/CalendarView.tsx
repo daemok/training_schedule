@@ -394,7 +394,7 @@ export function CalendarView({
           >
             다음 →
           </button>
-          <span className="ml-2 text-lg font-medium text-black dark:text-zinc-50">
+          <span className="ml-2 text-xl font-semibold text-black dark:text-zinc-50">
             {title}
           </span>
           {loading && (

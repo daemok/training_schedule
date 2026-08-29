@@ -45,6 +45,12 @@ export default async function Home() {
               >
                 내 신청 내역
               </Link>
+              <Link
+                href="/public-calendar"
+                className="flex h-12 items-center justify-center rounded-full border border-black/[.15] px-6 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-50 dark:hover:bg-white/[.06]"
+              >
+                확정 강의 캘린더
+              </Link>
             </>
           )}
           {user.role === "INSTRUCTOR" && (
@@ -53,13 +59,19 @@ export default async function Home() {
                 href="/calendar"
                 className="flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
               >
-                공용 캘린더 보기
+                운영 캘린더 보기
               </Link>
               <Link
                 href="/my-schedule"
                 className="flex h-12 items-center justify-center rounded-full border border-black/[.15] px-6 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-50 dark:hover:bg-white/[.06]"
               >
                 내 스케줄 관리
+              </Link>
+              <Link
+                href="/public-calendar"
+                className="flex h-12 items-center justify-center rounded-full border border-black/[.15] px-6 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-50 dark:hover:bg-white/[.06]"
+              >
+                확정 강의 캘린더
               </Link>
             </>
           )}
@@ -69,7 +81,7 @@ export default async function Home() {
                 href="/calendar"
                 className="flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
               >
-                공용 캘린더 보기
+                운영 캘린더 보기
               </Link>
               <Link
                 href="/admin"
@@ -82,6 +94,12 @@ export default async function Home() {
                 className="flex h-12 items-center justify-center rounded-full border border-black/[.15] px-6 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-50 dark:hover:bg-white/[.06]"
               >
                 강의 신청하기
+              </Link>
+              <Link
+                href="/public-calendar"
+                className="flex h-12 items-center justify-center rounded-full border border-black/[.15] px-6 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-50 dark:hover:bg-white/[.06]"
+              >
+                확정 강의 캘린더
               </Link>
             </>
           )}

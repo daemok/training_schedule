@@ -6,10 +6,18 @@ import Link from "next/link";
 import { ScheduleDTO, TIME_BLOCK_LABEL, SCHEDULE_TYPE_LABEL } from "./types";
 import { ScheduleFormModal, ScheduleFormPayload, SubmitResult } from "./ScheduleFormModal";
 import { BulkPersonalScheduleModal, BulkSchedulePayload } from "./BulkPersonalScheduleModal";
+import { BulkPersonalManageModal, BulkEditPayload } from "./BulkPersonalManageModal";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
-import { submitBulkPersonalSchedule, type BulkSubmitResult } from "@/lib/schedule-bulk";
+import {
+  submitBulkPersonalSchedule,
+  submitBulkPersonalDelete,
+  submitBulkPersonalEdit,
+  type BulkSubmitResult,
+  type BulkEditResult,
+  type BulkDeleteResult,
+} from "@/lib/schedule-bulk";
 
 const TOAST_DURATION_MS = 3000;
 
@@ -42,6 +50,7 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleDTO | null>(null);
   const [bulkFormOpen, setBulkFormOpen] = useState(false);
+  const [bulkManageOpen, setBulkManageOpen] = useState(false);
   const [deleting, setDeleting] = useState<ScheduleDTO | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -89,6 +98,22 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
   }
   function closeBulk() {
     setBulkFormOpen(false);
+  }
+
+  async function handleBulkDelete(ids: number[]): Promise<BulkDeleteResult> {
+    const result = await submitBulkPersonalDelete(ids);
+    if (result.ok) {
+      router.refresh();
+    }
+    return result;
+  }
+
+  async function handleBulkEdit(payload: BulkEditPayload, force: boolean): Promise<BulkEditResult> {
+    const result = await submitBulkPersonalEdit({ ...payload, force });
+    if (result.ok) {
+      router.refresh();
+    }
+    return result;
   }
 
   async function handleFormSubmit(
@@ -224,6 +249,12 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
             + 개인일정 일괄 등록
           </button>
           <button
+            onClick={() => setBulkManageOpen(true)}
+            className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-black dark:border-zinc-700 dark:hover:border-zinc-50"
+          >
+            일정 일괄 관리
+          </button>
+          <button
             onClick={openCreate}
             className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
           >
@@ -317,6 +348,14 @@ export function ScheduleManager({ year, month, prevHref, nextHref, schedules }: 
 
       {bulkFormOpen && (
         <BulkPersonalScheduleModal onCancel={closeBulk} onSubmit={handleBulkSubmit} />
+      )}
+
+      {bulkManageOpen && (
+        <BulkPersonalManageModal
+          onCancel={() => setBulkManageOpen(false)}
+          onDeleteSubmit={handleBulkDelete}
+          onEditSubmit={handleBulkEdit}
+        />
       )}
 
       {deleting && (

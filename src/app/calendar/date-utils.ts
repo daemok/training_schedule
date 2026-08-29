@@ -6,8 +6,16 @@ export function addDaysUTC(date: Date, days: number): Date {
   return copy;
 }
 
-function addMonthsUTC(date: Date, months: number): Date {
+export function addMonthsUTC(date: Date, months: number): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+}
+
+/**
+ * 모든 캘린더 화면이 최초 진입 시 기본으로 보여줄 "다음 달 1일" — 오늘이 속한 달의 다음 달을
+ * 반환한다(사용자가 "오늘" 버튼을 누르면 실제 오늘이 속한 달로 돌아간다, 초기값에만 적용).
+ */
+export function nextMonthAnchor(base: Date = new Date()): Date {
+  return addMonthsUTC(new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), 1)), 1);
 }
 
 /** 선택된 뷰(월/주/일)에 해당하는 조회 날짜 범위. end는 미포함(exclusive). */

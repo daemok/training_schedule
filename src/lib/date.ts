@@ -27,3 +27,26 @@ export function shiftMonth(year: number, month: number, delta: number) {
   const d = new Date(Date.UTC(year, month - 1 + delta, 1));
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
 }
+
+/**
+ * 이 앱은 한국 사용자 전용(휴일 데이터도 KR 전용)이므로, 날짜+시각 입력은 한국 표준시(KST,
+ * UTC+9, 서머타임 없음)로 해석한다.
+ */
+const KST_OFFSET = "+09:00";
+
+/**
+ * `<input type="datetime-local">` 값("yyyy-MM-ddTHH:mm")을 KST 벽시계 시각으로 해석해
+ * 올바른 UTC 시각의 Date로 변환한다. 초/분이 없는 등 형식이 어긋나면 Invalid Date를 반환한다.
+ */
+export function toDateTimeKst(dateTimeLocalStr: string): Date {
+  return new Date(`${dateTimeLocalStr}:00${KST_OFFSET}`);
+}
+
+/**
+ * 저장된 UTC Date를 KST 벽시계 기준 "yyyy-MM-ddTHH:mm" 문자열로 변환한다 —
+ * `<input type="datetime-local">`의 value로 다시 넣기 위함.
+ */
+export function formatDateTimeKstLocal(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 16);
+}

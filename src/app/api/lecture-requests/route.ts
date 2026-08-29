@@ -140,16 +140,16 @@ export async function POST(request: NextRequest) {
   // 신청 가능 기간은 일반 사용자에게만 적용된다 — 팀장/매니저는 상급자로서 기간과 무관하게
   // 신청할 수 있다(위 POST 주석 참고).
   if (user.role === "GENERAL") {
-    // 신청 기간은 날짜 단위(자정 기준)로 비교한다 — 종료일 당일까지는 신청 가능해야 하므로
-    // 시각까지 포함한 now를 그대로 비교하면 종료일 당일이 이미 지난 것으로 잘못 처리된다.
-    const today = toDateOnly(formatDateOnly(new Date()));
-    if (lectureType.applicationStartDate && today < lectureType.applicationStartDate) {
+    // 신청 기간은 이제 날짜+시각까지 관리자가 직접 지정하므로(예: 종료일 18:00까지),
+    // 시각까지 포함한 현재 시각을 그대로 비교한다.
+    const now = new Date();
+    if (lectureType.applicationStartDate && now < lectureType.applicationStartDate) {
       return NextResponse.json(
         { error: "아직 신청 기간이 시작되지 않은 강의입니다." },
         { status: 400 }
       );
     }
-    if (lectureType.applicationEndDate && today > lectureType.applicationEndDate) {
+    if (lectureType.applicationEndDate && now > lectureType.applicationEndDate) {
       return NextResponse.json({ error: "신청 기간이 종료된 강의입니다." }, { status: 400 });
     }
   }

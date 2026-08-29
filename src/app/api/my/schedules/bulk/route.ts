@@ -120,3 +120,164 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ createdCount: created.length, dates: dates.slice().sort() }, { status: 201 });
 }
+
+/**
+ * 대상 id 배열이 전부 요청 강사 본인 소유의 PERSONAL 스케줄인지 확인한다 — 하나라도 아니면
+ * 전체를 거부한다(부분 성공 없음, POST의 "강사 전용" 규칙과 동일하게 대리 처리는 지원하지 않음).
+ */
+async function loadOwnedPersonalSchedules(instructorId: number, ids: number[]) {
+  const schedules = await prisma.schedule.findMany({
+    where: { id: { in: ids }, instructorId, scheduleType: "PERSONAL" },
+  });
+  if (schedules.length !== ids.length) {
+    return null;
+  }
+  return schedules;
+}
+
+function parseIds(body: Record<string, unknown> | null): number[] | null {
+  const raw = Array.isArray(body?.ids) ? body.ids : [];
+  const ids = Array.from(new Set(raw.filter((v): v is number => Number.isInteger(v))));
+  if (ids.length === 0 || ids.length > MAX_BULK_PERSONAL_DATES) {
+    return null;
+  }
+  return ids;
+}
+
+/**
+ * PATCH /api/my/schedules/bulk — 선택한 여러 개인일정에 동일한 새 사유/장소/시간대를
+ * 한 번에 적용한다(강사 본인 전용). 시간대를 바꾸는 경우 각 행마다 날짜가 다르므로
+ * 새 시간대 기준으로 각각 충돌 여부를 확인하고, 하나라도 겹치면 force:true 없이는
+ * 아무것도 바꾸지 않는다(bulk-create와 동일한 충돌 응답 형식).
+ */
+export async function PATCH(request: NextRequest) {
+  const user = await getSessionFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  if (user.role !== "INSTRUCTOR" || !user.instructorId) {
+    return NextResponse.json({ error: "강사 계정만 사용할 수 있습니다." }, { status: 403 });
+  }
+  const instructorId = user.instructorId;
+
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const ids = parseIds(body);
+  if (!ids) {
+    return NextResponse.json(
+      { error: `수정할 일정을 1개 이상 ${MAX_BULK_PERSONAL_DATES}개 이하로 선택해주세요.` },
+      { status: 400 }
+    );
+  }
+
+  const schedules = await loadOwnedPersonalSchedules(instructorId, ids);
+  if (!schedules) {
+    return NextResponse.json(
+      { error: "본인의 개인일정만 일괄 수정할 수 있습니다." },
+      { status: 403 }
+    );
+  }
+
+  const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : undefined;
+  const location = typeof body?.location === "string" ? body.location.trim() || null : undefined;
+  const personalBlock =
+    typeof body?.personalBlock === "string" &&
+    (["MORNING", "AFTERNOON", "EVENING"] as readonly string[]).includes(body.personalBlock)
+      ? (body.personalBlock as TimeBlock)
+      : undefined;
+  const force = Boolean(body?.force);
+
+  if (title === undefined && location === undefined && personalBlock === undefined) {
+    return NextResponse.json({ error: "변경할 값이 없습니다." }, { status: 400 });
+  }
+
+  if (personalBlock && !force) {
+    const conflictLists = await Promise.all(
+      schedules.map(async (s) => {
+        const conflicts = await findOverlaps(instructorId, s.date, personalBlock, null, null, s.id);
+        return conflicts.map((c) => ({
+          date: s.date.toISOString().slice(0, 10),
+          timeBlock: personalBlock,
+          title: c.title,
+        }));
+      })
+    );
+    const conflicts = conflictLists.flat();
+    if (conflicts.length > 0) {
+      const conflictingCount = new Set(conflicts.map((c) => c.date)).size;
+      return NextResponse.json(
+        {
+          error: `${conflictingCount}개 날짜에 이미 겹치는 일정이 있습니다.`,
+          overlap: true,
+          conflicts,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  await prisma.schedule.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      ...(title !== undefined ? { title } : {}),
+      ...(location !== undefined ? { location } : {}),
+      ...(personalBlock ? { timeBlock: personalBlock } : {}),
+    },
+  });
+
+  return NextResponse.json({ updatedCount: ids.length });
+}
+
+/**
+ * DELETE /api/my/schedules/bulk — 선택한 여러 개인일정을 한 번에 삭제한다(강사 본인 전용).
+ * 단건 삭제(src/app/api/my/schedules/[id]/route.ts)와 동일하게 삭제 전 스냅샷을
+ * ScheduleDeleteLog에 남기되, N개의 create 대신 createMany + deleteMany로 배치 처리한다
+ * (ScheduleDeleteLog는 Schedule에 FK가 없어 안전 — schema.prisma 모델 주석 참고).
+ */
+export async function DELETE(request: NextRequest) {
+  const user = await getSessionFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+  if (user.role !== "INSTRUCTOR" || !user.instructorId) {
+    return NextResponse.json({ error: "강사 계정만 사용할 수 있습니다." }, { status: 403 });
+  }
+  const instructorId = user.instructorId;
+
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const ids = parseIds(body);
+  if (!ids) {
+    return NextResponse.json(
+      { error: `삭제할 일정을 1개 이상 ${MAX_BULK_PERSONAL_DATES}개 이하로 선택해주세요.` },
+      { status: 400 }
+    );
+  }
+
+  const schedules = await loadOwnedPersonalSchedules(instructorId, ids);
+  if (!schedules) {
+    return NextResponse.json(
+      { error: "본인의 개인일정만 일괄 삭제할 수 있습니다." },
+      { status: 403 }
+    );
+  }
+
+  await prisma.$transaction([
+    prisma.scheduleDeleteLog.createMany({
+      data: schedules.map((s) => ({
+        scheduleId: s.id,
+        instructorId: s.instructorId,
+        date: s.date,
+        timeBlock: s.timeBlock,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        scheduleType: s.scheduleType,
+        title: s.title,
+        location: s.location,
+        memo: s.memo,
+        deletedByUserId: user.userId,
+      })),
+    }),
+    prisma.schedule.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+
+  return NextResponse.json({ deletedCount: schedules.length });
+}

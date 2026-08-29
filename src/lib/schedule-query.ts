@@ -100,3 +100,47 @@ export async function fetchMaskedSchedules(params: {
       : null,
   }));
 }
+
+/**
+ * 공용 캘린더(모든 로그인 사용자, GENERAL 포함이 열람) 조회 — 확정된(CONFIRMED) 강의
+ * (LECTURE)만 대상이며, 개인일정과 미확정(PROVISIONAL) 건은 애초에 DB 레벨에서 제외한다.
+ * 요청자 정보(FC/LOS, 참석인원, 내용 등)는 민감정보이므로 lectureRequest는 항상 null로
+ * 내려준다 — title에는 정식 강의유형명을 쓴다(강의 신청으로 생성된 건은 title에
+ * "(신청)" 접미사가 붙어 있으므로 lectureType.name을 우선 사용하고, 팀장/매니저가 직접
+ * 등록한 자유 텍스트 title은 그대로 사용).
+ */
+export async function fetchPublicLectureSchedules(params: {
+  from: Date;
+  to: Date;
+  instructorId?: number;
+}): Promise<MaskedScheduleRow[]> {
+  const schedules = await prisma.schedule.findMany({
+    where: {
+      date: { gte: params.from, lt: params.to },
+      scheduleType: "LECTURE",
+      status: "CONFIRMED",
+      ...(params.instructorId ? { instructorId: params.instructorId } : {}),
+    },
+    include: {
+      instructor: { select: { name: true } },
+      lectureRequest: { include: { lectureType: { select: { name: true } } } },
+    },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+  });
+
+  return schedules.map((s) => ({
+    id: s.id,
+    date: formatDateOnly(s.date),
+    timeBlock: s.timeBlock,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    scheduleType: s.scheduleType,
+    status: s.status,
+    title: s.lectureRequest?.lectureType.name ?? s.title,
+    location: s.location,
+    memo: null,
+    instructorId: s.instructorId,
+    instructorName: s.instructor.name,
+    lectureRequest: null,
+  }));
+}

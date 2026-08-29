@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { formatDateOnly } from "@/lib/date";
-import { buildMonthGridDays, formatMonthTitle, shiftAnchor } from "@/app/calendar/date-utils";
+import {
+  buildMonthGridDays,
+  formatMonthTitle,
+  shiftAnchor,
+  nextMonthAnchor,
+} from "@/app/calendar/date-utils";
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
 import {
@@ -49,7 +54,8 @@ function computeExpiresAt(expiresInMs: number): number {
 export function ApplyCalendarView({ lectureTypes }: Props) {
   const [lectureTypeId, setLectureTypeId] = useState<number | "">(lectureTypes[0]?.id ?? "");
   const [instructorFilter, setInstructorFilter] = useState<number | "ALL">("ALL");
-  const [anchor, setAnchor] = useState(currentMonthAnchor);
+  // 최초 진입 시에는 다음 달을 기본으로 보여준다("오늘" 버튼은 실제 오늘이 속한 달로 이동).
+  const [anchor, setAnchor] = useState(() => nextMonthAnchor());
   const [instructors, setInstructors] = useState<InstructorOption[]>([]);
   const [schedules, setSchedules] = useState<DatedScheduleRow[]>([]);
   const [locks, setLocks] = useState<ActiveLock[]>([]);
@@ -261,7 +267,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
           >
             다음 →
           </button>
-          <span className="text-sm font-medium text-black dark:text-zinc-50">
+          <span className="text-xl font-semibold text-black dark:text-zinc-50">
             {formatMonthTitle(anchor)}
           </span>
           {loading && <span className="text-xs text-zinc-400">불러오는 중...</span>}

@@ -65,8 +65,9 @@ model Instructor {
   status    InstructorStatus  @default(ACTIVE)
   // 소속 브랜드 — 과거의 자유 텍스트 "소속팀"을 대체한다. 강사가 강의 가능한 브랜드를
   // 관리하는 용도로만 쓰이며, 강의 프로그램(LectureType)과는 더 이상 연결되지 않는다.
-  brandId   Int               @map("lecture_brand_id")
-  brand     LectureBrand      @relation(fields: [brandId], references: [id])
+  // 한 강사가 여러 브랜드에 소속될 수 있어 InstructorLectureBrand 조인 테이블로 관리한다
+  // (등록 시 최소 1개 필수 — 애플리케이션 레벨에서 강제, src/app/api/instructors/route.ts).
+  brands    InstructorLectureBrand[]
   schedules Schedule[]
   user      User?
   lectureTypes    InstructorLectureType[]
@@ -74,7 +75,6 @@ model Instructor {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  @@index([brandId])
   @@map("instructors")
 }
 
@@ -182,13 +182,13 @@ model ScheduleDeleteLog {
 }
 
 // 브랜드 — 강사의 소속/담당 브랜드. 팀장/매니저가 "강사 및 강의 관리" 화면에서 관리하며,
-// 강사를 등록할 때 반드시 하나의 브랜드를 선택해야 한다. 강의 프로그램(LectureType)과는
+// 강사를 등록할 때 최소 1개 이상 선택해야 한다(여러 개 선택 가능). 강의 프로그램(LectureType)과는
 // 더 이상 연결되지 않는다(과거에는 LectureType의 상위 분류였다).
 model LectureBrand {
   id          Int           @id @default(autoincrement()) @map("lecture_brand_id")
   name        String        @unique
   isActive    Boolean       @default(true) @map("is_active")
-  instructors Instructor[]
+  instructors InstructorLectureBrand[]
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
@@ -214,6 +214,19 @@ model LectureType {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("lecture_types")
+}
+
+// 강사별 소속 브랜드 — 팀장/매니저만 관리한다(강사 등록/수정 시 다중 선택).
+model InstructorLectureBrand {
+  id           Int          @id @default(autoincrement())
+  instructorId Int          @map("instructor_id")
+  instructor   Instructor   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  brandId      Int          @map("lecture_brand_id")
+  brand        LectureBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@unique([instructorId, brandId])
+  @@map("instructor_lecture_brands")
 }
 
 // 강사별 "가르칠 수 있는 강의 유형" — 팀장/매니저만 관리한다(강사 관리).

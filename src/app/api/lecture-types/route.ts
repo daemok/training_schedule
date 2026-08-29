@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/require-role";
 import { getSessionFromRequest } from "@/lib/auth/current-user";
-import { toDateOnly, formatDateOnly } from "@/lib/date";
+import { toDateTimeKst } from "@/lib/date";
 
 /**
  * GET /api/lecture-types — 강의 프로그램 목록.
@@ -24,12 +24,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(lectureTypes);
   }
 
-  const today = toDateOnly(formatDateOnly(new Date()));
+  const now = new Date();
   const open = lectureTypes.filter(
     (t) =>
       t.isActive &&
-      (!t.applicationStartDate || t.applicationStartDate <= today) &&
-      (!t.applicationEndDate || t.applicationEndDate >= today)
+      (!t.applicationStartDate || t.applicationStartDate <= now) &&
+      (!t.applicationEndDate || t.applicationEndDate >= now)
   );
   return NextResponse.json(open);
 }
@@ -50,23 +50,23 @@ export async function POST(request: NextRequest) {
       ? body.description.trim()
       : null;
 
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
   const startRaw = typeof body?.applicationStartDate === "string" ? body.applicationStartDate : "";
   const endRaw = typeof body?.applicationEndDate === "string" ? body.applicationEndDate : "";
-  if (startRaw && !DATE_RE.test(startRaw)) {
-    return NextResponse.json({ error: "신청 시작일 형식이 올바르지 않습니다." }, { status: 400 });
+  if (startRaw && !DATETIME_RE.test(startRaw)) {
+    return NextResponse.json({ error: "신청 시작 일시 형식이 올바르지 않습니다." }, { status: 400 });
   }
-  if (endRaw && !DATE_RE.test(endRaw)) {
-    return NextResponse.json({ error: "신청 종료일 형식이 올바르지 않습니다." }, { status: 400 });
+  if (endRaw && !DATETIME_RE.test(endRaw)) {
+    return NextResponse.json({ error: "신청 종료 일시 형식이 올바르지 않습니다." }, { status: 400 });
   }
-  if (startRaw && endRaw && endRaw < startRaw) {
+  const applicationStartDate = startRaw ? toDateTimeKst(startRaw) : null;
+  const applicationEndDate = endRaw ? toDateTimeKst(endRaw) : null;
+  if (applicationStartDate && applicationEndDate && applicationEndDate < applicationStartDate) {
     return NextResponse.json(
-      { error: "신청 종료일은 시작일보다 빠를 수 없습니다." },
+      { error: "신청 종료 일시는 시작 일시보다 빠를 수 없습니다." },
       { status: 400 }
     );
   }
-  const applicationStartDate = startRaw ? toDateOnly(startRaw) : null;
-  const applicationEndDate = endRaw ? toDateOnly(endRaw) : null;
 
   const existing = await prisma.lectureType.findUnique({ where: { name } });
   if (existing) {

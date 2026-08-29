@@ -15,7 +15,7 @@ export default async function AdminInstructorsPage() {
   const [instructorsRaw, lectureTypesRaw, links, brands] = await Promise.all([
     prisma.instructor.findMany({
       orderBy: { name: "asc" },
-      include: { brand: { select: { id: true, name: true } } },
+      include: { brands: { include: { brand: { select: { id: true, name: true } } } } },
     }),
     prisma.lectureType.findMany({ orderBy: { name: "asc" } }),
     prisma.instructorLectureType.findMany(),
@@ -26,8 +26,7 @@ export default async function AdminInstructorsPage() {
     id: i.id,
     name: i.name,
     status: i.status,
-    brandId: i.brand.id,
-    brandName: i.brand.name,
+    brands: i.brands.map((b) => b.brand),
   }));
 
   const lectureTypes = lectureTypesRaw.map((t) => ({

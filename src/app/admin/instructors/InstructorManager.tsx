@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { InstructorFormModal, InstructorOption, BrandOption, SubmitResult } from "./InstructorFormModal";
 import { Toast } from "@/components/Toast";
+import { formatDateTimeKstLocal } from "@/lib/date";
 
 interface LectureBrand {
   id: number;
@@ -86,7 +87,7 @@ export function InstructorManager({
 
   async function handleInstructorSubmit(payload: {
     name: string;
-    brandId: number;
+    brandIds: number[];
     status: "ACTIVE" | "INACTIVE";
     email?: string;
   }): Promise<SubmitResult> {
@@ -104,7 +105,7 @@ export function InstructorManager({
         id: number;
         name: string;
         status: "ACTIVE" | "INACTIVE";
-        brand: { id: number; name: string };
+        brands: { id: number; name: string }[];
         email?: string;
         temporaryPassword?: string;
       };
@@ -112,8 +113,7 @@ export function InstructorManager({
         id: saved.id,
         name: saved.name,
         status: saved.status,
-        brandId: saved.brand.id,
-        brandName: saved.brand.name,
+        brands: saved.brands,
       };
       setInstructors((prev) => {
         const next = editingInstructor
@@ -219,8 +219,12 @@ export function InstructorManager({
         name: created.name,
         description: created.description,
         isActive: created.isActive,
-        applicationStartDate: created.applicationStartDate?.slice(0, 10) ?? null,
-        applicationEndDate: created.applicationEndDate?.slice(0, 10) ?? null,
+        applicationStartDate: created.applicationStartDate
+          ? formatDateTimeKstLocal(new Date(created.applicationStartDate))
+          : null,
+        applicationEndDate: created.applicationEndDate
+          ? formatDateTimeKstLocal(new Date(created.applicationEndDate))
+          : null,
       };
       setLectureTypes((prev) => [...prev, normalized].sort((a, b) => a.name.localeCompare(b.name)));
       setNewTypeName("");
@@ -286,8 +290,12 @@ export function InstructorManager({
         name: updated.name,
         description: updated.description,
         isActive: updated.isActive,
-        applicationStartDate: updated.applicationStartDate?.slice(0, 10) ?? null,
-        applicationEndDate: updated.applicationEndDate?.slice(0, 10) ?? null,
+        applicationStartDate: updated.applicationStartDate
+          ? formatDateTimeKstLocal(new Date(updated.applicationStartDate))
+          : null,
+        applicationEndDate: updated.applicationEndDate
+          ? formatDateTimeKstLocal(new Date(updated.applicationEndDate))
+          : null,
       };
       setLectureTypes((prev) =>
         prev.map((t) => (t.id === normalized.id ? normalized : t)).sort((a, b) => a.name.localeCompare(b.name))
@@ -355,7 +363,9 @@ export function InstructorManager({
             >
               <div>
                 <span className="font-medium text-black dark:text-zinc-50">{instructor.name}</span>
-                <span className="ml-2 text-sm text-zinc-500">{instructor.brandName}</span>
+                <span className="ml-2 text-sm text-zinc-500">
+                  {instructor.brands.map((b) => b.name).join(", ")}
+                </span>
                 {instructor.status === "INACTIVE" && (
                   <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
                     비활성
@@ -398,7 +408,9 @@ export function InstructorManager({
                   <span className="font-medium text-black dark:text-zinc-50">
                     {instructor.name}
                   </span>
-                  <span className="ml-2 text-sm text-zinc-500">{instructor.brandName}</span>
+                  <span className="ml-2 text-sm text-zinc-500">
+                    {instructor.brands.map((b) => b.name).join(", ")}
+                  </span>
                   {instructor.status === "INACTIVE" && (
                     <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
                       비활성 강사
@@ -557,10 +569,10 @@ export function InstructorManager({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                      신청 시작일 (선택 — 비우면 제한 없음)
+                      신청 시작 일시 (선택 — 비우면 제한 없음)
                     </label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       value={editTypeStartDate}
                       onChange={(e) => setEditTypeStartDate(e.target.value)}
                       className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -568,10 +580,10 @@ export function InstructorManager({
                   </div>
                   <div className="flex-1">
                     <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                      신청 종료일 (선택 — 비우면 제한 없음)
+                      신청 종료 일시 (선택 — 비우면 제한 없음)
                     </label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       value={editTypeEndDate}
                       onChange={(e) => setEditTypeEndDate(e.target.value)}
                       className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -612,7 +624,9 @@ export function InstructorManager({
                   <div className="mt-0.5 text-xs text-zinc-500">
                     신청 기간:{" "}
                     {t.applicationStartDate || t.applicationEndDate
-                      ? `${t.applicationStartDate ?? "제한 없음"} ~ ${t.applicationEndDate ?? "제한 없음"}`
+                      ? `${t.applicationStartDate?.replace("T", " ") ?? "제한 없음"} ~ ${
+                          t.applicationEndDate?.replace("T", " ") ?? "제한 없음"
+                        }`
                       : "제한 없음"}
                   </div>
                 </div>
@@ -662,10 +676,10 @@ export function InstructorManager({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                신청 시작일 (선택 — 비우면 제한 없음)
+                신청 시작 일시 (선택 — 비우면 제한 없음)
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 value={newTypeStartDate}
                 onChange={(e) => setNewTypeStartDate(e.target.value)}
                 className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -673,10 +687,10 @@ export function InstructorManager({
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                신청 종료일 (선택 — 비우면 제한 없음)
+                신청 종료 일시 (선택 — 비우면 제한 없음)
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 value={newTypeEndDate}
                 onChange={(e) => setNewTypeEndDate(e.target.value)}
                 className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -720,7 +734,7 @@ export function InstructorManager({
               강사를 삭제할까요?
             </h2>
             <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-              {deleting.name} ({deleting.brandName})
+              {deleting.name} ({deleting.brands.map((b) => b.name).join(", ")})
             </p>
             <p className="mb-4 text-xs text-zinc-500">
               등록된 스케줄이나 강의 신청 이력, 연결된 로그인 계정이 있으면 삭제할 수 없습니다 —

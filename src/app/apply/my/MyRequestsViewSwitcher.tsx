@@ -1,30 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ScheduleDTO } from "./types";
-import { ScheduleManager } from "./ScheduleManager";
-import { ScheduleCalendarView } from "./ScheduleCalendarView";
+import { MyRequestsList } from "./MyRequestsList";
+import { MyRequestsCalendarView } from "./MyRequestsCalendarView";
+import type { MyRequestRow } from "./types";
 
 type ViewMode = "list" | "calendar";
 
-interface Props {
-  instructorId: number;
-  year: number;
-  month: number;
-  prevHref: string;
-  nextHref: string;
-  schedules: ScheduleDTO[];
-}
-
-/** 강사 본인 스케줄을 리스트형(월별 목록) 또는 캘린더형(월/주/일)으로 전환해서 볼 수 있다. */
-export function ScheduleViewSwitcher({
-  instructorId,
-  year,
-  month,
-  prevHref,
-  nextHref,
-  schedules,
-}: Props) {
+/** 내 신청 내역을 리스트형 또는 캘린더형으로 전환해서 볼 수 있다(기본은 캘린더형). */
+export function MyRequestsViewSwitcher({ requests }: { requests: MyRequestRow[] }) {
   const [view, setView] = useState<ViewMode>("calendar");
 
   return (
@@ -53,15 +37,9 @@ export function ScheduleViewSwitcher({
       </div>
 
       {view === "list" ? (
-        <ScheduleManager
-          year={year}
-          month={month}
-          prevHref={prevHref}
-          nextHref={nextHref}
-          schedules={schedules}
-        />
+        <MyRequestsList requests={requests} />
       ) : (
-        <ScheduleCalendarView instructorId={instructorId} />
+        <MyRequestsCalendarView requests={requests} />
       )}
     </div>
   );

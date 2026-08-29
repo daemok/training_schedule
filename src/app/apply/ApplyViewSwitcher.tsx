@@ -9,7 +9,7 @@ type ViewMode = "list" | "calendar";
 
 /** 강의 신청 화면을 리스트형(날짜 하나씩) 또는 캘린더형(월 전체)으로 전환해서 볼 수 있다. */
 export function ApplyViewSwitcher({ lectureTypes }: { lectureTypes: LectureType[] }) {
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("calendar");
 
   return (
     <div className="flex flex-col gap-4">

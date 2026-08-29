@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const data: { name?: string; brandId?: number; status?: (typeof VALID_STATUSES)[number] } = {};
+  const data: { name?: string; status?: (typeof VALID_STATUSES)[number] } = {};
 
   if (typeof body?.name === "string") {
     const name = body.name.trim();
@@ -27,29 +27,47 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     data.name = name;
   }
-  if (body?.brandId !== undefined) {
-    const brandId = Number(body.brandId);
-    if (!Number.isInteger(brandId)) {
-      return NextResponse.json({ error: "잘못된 브랜드입니다." }, { status: 400 });
+
+  let brandIds: number[] | undefined;
+  if (body?.brandIds !== undefined) {
+    if (!Array.isArray(body.brandIds)) {
+      return NextResponse.json({ error: "brandIds 배열이 필요합니다." }, { status: 400 });
     }
-    const brand = await prisma.lectureBrand.findUnique({ where: { id: brandId } });
-    if (!brand) {
+    const parsed = (body.brandIds as unknown[]).map((v) => Number(v));
+    if (parsed.length === 0 || !parsed.every((v) => Number.isInteger(v))) {
+      return NextResponse.json({ error: "브랜드를 1개 이상 선택해주세요." }, { status: 400 });
+    }
+    brandIds = Array.from(new Set(parsed));
+    const foundBrands = await prisma.lectureBrand.findMany({ where: { id: { in: brandIds } } });
+    if (foundBrands.length !== brandIds.length) {
       return NextResponse.json({ error: "브랜드를 찾을 수 없습니다." }, { status: 404 });
     }
-    data.brandId = brandId;
   }
+
   if (typeof body?.status === "string" && VALID_STATUSES.includes(body.status as never)) {
     data.status = body.status as (typeof VALID_STATUSES)[number];
   }
 
-  const updated = await prisma.instructor
-    .update({ where: { id }, data, include: { brand: { select: { id: true, name: true } } } })
+  const updated = await prisma
+    .$transaction(async (tx) => {
+      await tx.instructor.update({ where: { id }, data });
+      if (brandIds) {
+        await tx.instructorLectureBrand.deleteMany({ where: { instructorId: id } });
+        await tx.instructorLectureBrand.createMany({
+          data: brandIds.map((brandId) => ({ instructorId: id, brandId })),
+        });
+      }
+      return tx.instructor.findUniqueOrThrow({
+        where: { id },
+        include: { brands: { include: { brand: { select: { id: true, name: true } } } } },
+      });
+    })
     .catch(() => null);
   if (!updated) {
     return NextResponse.json({ error: "강사를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, brands: updated.brands.map((b) => b.brand) });
 }
 
 /**

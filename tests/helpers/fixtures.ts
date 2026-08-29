@@ -19,6 +19,7 @@ export async function resetDb() {
   await prisma.scheduleDeleteLog.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.instructorLectureBrand.deleteMany();
   await prisma.instructor.deleteMany();
   await prisma.lectureBrand.deleteMany();
 
@@ -29,10 +30,10 @@ export async function resetDb() {
   const brandB = await prisma.lectureBrand.create({ data: { name: "B브랜드" } });
 
   const instructorA = await prisma.instructor.create({
-    data: { name: "테스트강사A", brandId: brandA.id },
+    data: { name: "테스트강사A", brands: { create: [{ brandId: brandA.id }] } },
   });
   const instructorB = await prisma.instructor.create({
-    data: { name: "테스트강사B", brandId: brandB.id },
+    data: { name: "테스트강사B", brands: { create: [{ brandId: brandB.id }] } },
   });
 
   const userInstructorA = await prisma.user.create({
