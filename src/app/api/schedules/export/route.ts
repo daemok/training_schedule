@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getSessionFromRequest } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/prisma";
 import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { fetchMaskedSchedules, type MaskedScheduleRow } from "@/lib/schedule-query";
 import { TIME_BLOCK_LABEL } from "@/lib/schedule-labels";
@@ -9,21 +8,6 @@ import { buildMonthGridDays, formatMonthTitle } from "@/app/calendar/date-utils"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAY_HEADERS = ["일", "월", "화", "수", "목", "금", "토"];
-
-// src/app/calendar/colors.ts의 강사 색상 팔레트(light 값)를 그대로 재사용 — 앱 화면과
-// 엑셀 파일의 색 구분이 시각적으로 일관되도록 한다. 여기서는 강사 개인이 아니라
-// "강사가 속한 브랜드"별로 배정한다(브랜드가 2개 이상이면 색은 첫 번째 브랜드 기준).
-const BRAND_COLOR_PALETTE = [
-  "FF2A78D6", // blue
-  "FFEB6834", // orange
-  "FF1BAF7A", // aqua
-  "FFEDA100", // yellow
-  "FFE87BA4", // magenta
-  "FF008300", // green
-  "FF4A3AA7", // violet
-  "FFE34948", // red
-];
-const GRAY_ARGB = "FF888888";
 
 interface RichTextRun {
   text: string;
@@ -39,12 +23,12 @@ function timeLabelFor(row: MaskedScheduleRow): string {
 /**
  * GET /api/schedules/export?from=2026-07-01&to=2026-08-01&instructor=ALL
  *
- * 선택된 기간 + 선택된 강사(또는 전체) 기준으로 스케줄을 실제 달력처럼 보이는 엑셀(.xlsx)로
- * 내려준다 — 월별로 한 시트씩, 요일 헤더 아래 주 단위 행마다 그 날짜의 모든 항목을
- * (브랜드 색상 태그 + 강의명 + FC/LOS + 시간 + 장소 + 강사명) 한 칸 안에 줄바꿈으로 쌓는다.
- * /api/schedules와 동일한 조회+마스킹(fetchMaskedSchedules)을 그대로 재사용하므로,
- * 개인일정 사유는 로그인한 강사 본인의 일정이 아닌 이상 파일에도 포함되지 않는다
- * (팀장/매니저가 내려받아도 "개인 일정"으로만 표시됨).
+ * 선택된 기간 + 선택된 강사(또는 전체) 기준으로, 확정된(CONFIRMED) 강의(LECTURE)만
+ * 실제 달력처럼 보이는 엑셀(.xlsx)로 내려준다 — 개인일정과 미확정 건은 제외한다.
+ * 월별로 한 시트씩, 요일 헤더 아래 주 단위 행마다 그 날짜의 모든 강의를 한 칸 안에
+ * 강의 1건당 2줄(1줄: "FC/LOS {값} {시간}", 2줄: "{장소} / {강사명}")로 줄바꿈해 쌓는다
+ * (강의 프로그램명/브랜드는 표시하지 않는다). /api/schedules와 동일한 조회+마스킹
+ * (fetchMaskedSchedules)을 재사용한 뒤 이 라우트에서 CONFIRMED LECTURE만 걸러낸다.
  */
 export async function GET(request: NextRequest) {
   const user = await getSessionFromRequest(request);
@@ -68,33 +52,13 @@ export async function GET(request: NextRequest) {
       ? Number(instructorParam)
       : undefined;
 
-  const rows = await fetchMaskedSchedules({
+  const allRows = await fetchMaskedSchedules({
     from: toDateOnly(from),
     to: toDateOnly(to),
     instructorId,
     viewer: { role: user.role, instructorId: user.instructorId ?? undefined },
   });
-
-  // 브랜드별 색상 배정 — 전체 브랜드를 id 순으로 고정 슬롯에 배정해, 필터가 바뀌어도
-  // 같은 브랜드는 항상 같은 색을 쓴다(src/app/calendar/colors.ts의 강사 색상 배정과 동일 원칙).
-  const allBrands = await prisma.lectureBrand.findMany({ orderBy: { id: "asc" } });
-  const brandColorById = new Map<number, string>(
-    allBrands.map((b, i) => [b.id, BRAND_COLOR_PALETTE[i % BRAND_COLOR_PALETTE.length]])
-  );
-
-  const instructorIds = Array.from(new Set(rows.map((r) => r.instructorId)));
-  const instructors = await prisma.instructor.findMany({
-    where: { id: { in: instructorIds } },
-    include: { brands: { include: { brand: true } } },
-  });
-  const instructorBrandInfo = new Map<number, { names: string; color: string }>(
-    instructors.map((i) => {
-      const brands = i.brands.map((b) => b.brand);
-      const names = brands.map((b) => b.name).join("/");
-      const color = brands.length > 0 ? brandColorById.get(brands[0].id) ?? GRAY_ARGB : GRAY_ARGB;
-      return [i.id, { names, color }];
-    })
-  );
+  const rows = allRows.filter((r) => r.scheduleType === "LECTURE" && r.status === "CONFIRMED");
 
   // from~to 기간이 걸쳐 있는 모든 달(yyyy-MM)에 대해, 실제로 해당 월에 데이터가 없어도
   // 최소 from이 속한 달은 빈 달력으로라도 보여준다.
@@ -152,18 +116,13 @@ export async function GET(request: NextRequest) {
         ];
 
         for (const row of rowsByDate.get(dateStr) ?? []) {
-          const info = instructorBrandInfo.get(row.instructorId);
-          if (info?.names) {
-            runs.push({ text: `[${info.names}] `, font: { bold: true, size: 9, color: { argb: info.color } } });
-          }
-          runs.push({ text: `${row.title}\n`, font: { bold: true, size: 9 } });
           runs.push({
-            text: `FC/LOS: ${row.lectureRequest?.fcLos ?? "-"} · 시간: ${timeLabelFor(row)}\n`,
-            font: { size: 8, color: { argb: "FF666666" } },
+            text: `FC/LOS ${row.lectureRequest?.fcLos ?? "-"} ${timeLabelFor(row)}\n`,
+            font: { bold: true, size: 9 },
           });
           runs.push({
-            text: `장소: ${row.location ?? "-"} · 강사명: ${row.instructorName}\n\n`,
-            font: { size: 8, color: { argb: "FF666666" } },
+            text: `${row.location ?? "-"} / ${row.instructorName}\n\n`,
+            font: { size: 9, color: { argb: "FF666666" } },
           });
         }
 

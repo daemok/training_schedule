@@ -9,10 +9,10 @@ import { makeRequest } from "../helpers/request";
 let fx: Awaited<ReturnType<typeof resetDb>>;
 
 /**
- * 엑셀 내보내기는 월별 달력 그리드로, 요일 칸 하나(richText)에 그 날짜의 모든 항목이
- * "[브랜드] 강의명 / FC/LOS·시간 / 장소·강사명" 형태로 줄바꿈되어 쌓인다
- * (src/app/api/schedules/export/route.ts). 시트 전체를 훑어 모든 셀의 richText run
- * 텍스트를 이어붙인 문자열 하나로 모아, 특정 문구(예: 비공개 사유)가 파일 어디에도
+ * 엑셀 내보내기는 월별 달력 그리드로, 요일 칸 하나(richText)에 그 날짜의 확정된 강의가
+ * "FC/LOS {값} {시간}" / "{장소} / {강사명}" 형태로 줄바꿈되어 쌓인다(개인일정과 미확정
+ * 건은 애초에 제외됨 — src/app/api/schedules/export/route.ts). 시트 전체를 훑어 모든
+ * 셀의 richText run 텍스트를 이어붙인 문자열 하나로 모아, 특정 문구가 파일 어디에도
  * 포함되는지/포함되지 않는지를 검사한다.
  */
 function extractAllText(sheet: ExcelJS.Worksheet): string {
@@ -32,6 +32,8 @@ function extractAllText(sheet: ExcelJS.Worksheet): string {
 
 const SECRET_REASON = "병원 진료 실제 사유(비공개)";
 const SECRET_MEMO = "정기 검진, 매우 민감한 개인 메모";
+const CONFIRMED_LOCATION = "확정강의실 A";
+const PROVISIONAL_LOCATION = "미확정강의실 B";
 
 beforeEach(async () => {
   fx = await resetDb();
@@ -46,6 +48,35 @@ beforeEach(async () => {
       scheduleType: "PERSONAL",
       title: SECRET_REASON,
       memo: SECRET_MEMO,
+    },
+  });
+
+  // 엑셀 내보내기는 확정된(CONFIRMED) 강의만 포함해야 하므로, 확정 강의 1건과
+  // 미확정(PROVISIONAL) 강의 1건을 함께 만들어 필터링을 검증한다.
+  await prisma.schedule.create({
+    data: {
+      instructorId: fx.instructorA.id,
+      date: new Date("2026-08-13T00:00:00.000Z"),
+      timeBlock: "MORNING",
+      startTime: "09:00",
+      endTime: "12:00",
+      scheduleType: "LECTURE",
+      status: "CONFIRMED",
+      title: "확정 강의",
+      location: CONFIRMED_LOCATION,
+    },
+  });
+  await prisma.schedule.create({
+    data: {
+      instructorId: fx.instructorA.id,
+      date: new Date("2026-08-14T00:00:00.000Z"),
+      timeBlock: "MORNING",
+      startTime: "09:00",
+      endTime: "12:00",
+      scheduleType: "LECTURE",
+      status: "PROVISIONAL",
+      title: "미확정 강의",
+      location: PROVISIONAL_LOCATION,
     },
   });
 });
@@ -113,9 +144,8 @@ describe("개인일정 사유 노출 정책 (조회 API)", () => {
   });
 });
 
-describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
-  it("팀장이 내려받은 엑셀 파일에는 실제 사유가 포함된다 (상급자 — 전체 권한)", async () => {
-    const cookie = await sessionCookieFor(fx.userTeamLead);
+describe("엑셀 내보내기 (확정 강의만, 개인일정 제외)", () => {
+  async function exportText(cookie: string): Promise<string> {
     const res = await exportGET(
       makeRequest(`${BASE}/export?${RANGE}`, { method: "GET", cookie })
     );
@@ -129,27 +159,30 @@ describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];
     expect(sheet).toBeDefined();
+    return extractAllText(sheet!);
+  }
 
-    const text = extractAllText(sheet);
+  it("팀장이 내려받아도 개인일정 사유는 포함되지 않는다 (애초에 제외됨)", async () => {
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+    const text = await exportText(cookie);
 
-    expect(text.includes(SECRET_REASON)).toBe(true);
+    expect(text.includes(SECRET_REASON)).toBe(false);
+    expect(text.includes("개인 일정")).toBe(false);
   });
 
-  it("다른 강사가 내려받은 엑셀 파일에는 실제 사유가 포함되지 않는다", async () => {
+  it("다른 강사가 내려받아도 개인일정 사유는 포함되지 않는다", async () => {
     const cookie = await sessionCookieFor(fx.userInstructorB);
-    const res = await exportGET(
-      makeRequest(`${BASE}/export?${RANGE}`, { method: "GET", cookie })
-    );
-    expect(res.status).toBe(200);
+    const text = await exportText(cookie);
 
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const workbook = new ExcelJS.Workbook();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.worksheets[0];
-    const text = extractAllText(sheet);
-
-    expect(text.includes("개인 일정")).toBe(true);
     expect(text.includes(SECRET_REASON)).toBe(false);
+    expect(text.includes("개인 일정")).toBe(false);
+  });
+
+  it("확정된 강의는 포함되고, 미확정 강의는 제외된다", async () => {
+    const cookie = await sessionCookieFor(fx.userTeamLead);
+    const text = await exportText(cookie);
+
+    expect(text.includes(CONFIRMED_LOCATION)).toBe(true);
+    expect(text.includes(PROVISIONAL_LOCATION)).toBe(false);
   });
 });
