@@ -9,20 +9,25 @@ import { makeRequest } from "../helpers/request";
 let fx: Awaited<ReturnType<typeof resetDb>>;
 
 /**
- * 엑셀 내보내기는 날짜별로 묶여 강의 1건당 2줄(1줄: "강의명: .../FC·LOS: .../시간: ...",
- * 2줄: "장소: .../강사명: ...")로 라벨이 셀에 그대로 표기된다(고정 헤더 행이 없음) —
- * src/app/api/schedules/export/route.ts. 각 블록의 첫 줄(1번 열)에서 "강의명: " 라벨을
- * 떼어내 실제 제목만 모은다.
+ * 엑셀 내보내기는 월별 달력 그리드로, 요일 칸 하나(richText)에 그 날짜의 모든 항목이
+ * "[브랜드] 강의명 / FC/LOS·시간 / 장소·강사명" 형태로 줄바꿈되어 쌓인다
+ * (src/app/api/schedules/export/route.ts). 시트 전체를 훑어 모든 셀의 richText run
+ * 텍스트를 이어붙인 문자열 하나로 모아, 특정 문구(예: 비공개 사유)가 파일 어디에도
+ * 포함되는지/포함되지 않는지를 검사한다.
  */
-function extractTitles(sheet: ExcelJS.Worksheet): string[] {
-  const titles: string[] = [];
+function extractAllText(sheet: ExcelJS.Worksheet): string {
+  const parts: string[] = [];
   sheet.eachRow((row) => {
-    const first = String(row.getCell(1).value ?? "");
-    if (first.startsWith("강의명: ")) {
-      titles.push(first.slice("강의명: ".length));
-    }
+    row.eachCell((cell) => {
+      const value = cell.value;
+      if (value && typeof value === "object" && "richText" in value) {
+        for (const run of value.richText) parts.push(run.text);
+      } else if (typeof value === "string") {
+        parts.push(value);
+      }
+    });
   });
-  return titles;
+  return parts.join("");
 }
 
 const SECRET_REASON = "병원 진료 실제 사유(비공개)";
@@ -122,12 +127,12 @@ describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
     // (런타임에는 동일한 Buffer) 타입 충돌이 나므로 eslint-disable 후 any로 우회한다.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.getWorksheet("스케줄");
+    const sheet = workbook.worksheets[0];
     expect(sheet).toBeDefined();
 
-    const titles = extractTitles(sheet!);
+    const text = extractAllText(sheet);
 
-    expect(titles.some((t) => t.includes(SECRET_REASON))).toBe(true);
+    expect(text.includes(SECRET_REASON)).toBe(true);
   });
 
   it("다른 강사가 내려받은 엑셀 파일에는 실제 사유가 포함되지 않는다", async () => {
@@ -141,10 +146,10 @@ describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
     const workbook = new ExcelJS.Workbook();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await workbook.xlsx.load(buffer as any);
-    const sheet = workbook.getWorksheet("스케줄");
-    const titles = extractTitles(sheet!);
+    const sheet = workbook.worksheets[0];
+    const text = extractAllText(sheet);
 
-    expect(titles).toContain("개인 일정");
-    expect(titles.some((t) => t.includes(SECRET_REASON))).toBe(false);
+    expect(text.includes("개인 일정")).toBe(true);
+    expect(text.includes(SECRET_REASON)).toBe(false);
   });
 });
