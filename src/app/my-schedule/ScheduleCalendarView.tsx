@@ -26,6 +26,7 @@ import { BulkPersonalManageModal, BulkEditPayload } from "./BulkPersonalManageMo
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { RejectReasonModal } from "@/components/RejectReasonModal";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import {
   submitBulkPersonalSchedule,
   submitBulkPersonalDelete,
@@ -419,6 +420,8 @@ export function ScheduleCalendarView({ instructorId }: Props) {
         </p>
       )}
 
+      <div className="relative">
+      {loading && <LoadingOverlay />}
       {view === "month" && (
         <MonthGrid
           anchor={anchor}
@@ -454,6 +457,7 @@ export function ScheduleCalendarView({ instructorId }: Props) {
           onSelectEmpty={openCreateAt}
         />
       )}
+      </div>
 
       {selected && (
         <DetailPanel

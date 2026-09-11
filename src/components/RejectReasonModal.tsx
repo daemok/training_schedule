@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface Props {
   onCancel: () => void;
@@ -20,7 +21,8 @@ export function RejectReasonModal({ onCancel, onSubmit, submitting }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="거절 처리 중..." />}
         <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
           강의 신청을 거절할까요?
         </h2>

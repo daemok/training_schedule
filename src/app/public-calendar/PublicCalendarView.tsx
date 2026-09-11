@@ -22,6 +22,7 @@ import { WeekView } from "@/app/calendar/WeekView";
 import { DayView } from "@/app/calendar/DayView";
 import { DetailPanel } from "@/app/calendar/DetailPanel";
 import { useKoreanHolidays } from "@/lib/korean-holidays";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface Props {
   instructors: InstructorOption[];
@@ -186,6 +187,8 @@ export function PublicCalendarView({
         </p>
       )}
 
+      <div className="relative">
+      {loading && <LoadingOverlay />}
       {view === "month" && (
         <MonthGrid
           anchor={anchor}
@@ -218,6 +221,7 @@ export function PublicCalendarView({
           onSelect={setSelected}
         />
       )}
+      </div>
 
       {selected && <DetailPanel schedule={selected} onClose={() => setSelected(null)} />}
     </div>

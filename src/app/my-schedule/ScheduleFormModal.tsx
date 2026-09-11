@@ -9,6 +9,7 @@ import {
 } from "./types";
 import { PERSONAL_TITLE_PLACEHOLDER } from "@/lib/access-control";
 import { ALL_DAY_BLOCKS } from "@/lib/schedule-all-day";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import type { PersonalBlockChoice } from "./personal-block";
 import { PERSONAL_BLOCK_LABEL } from "./personal-block";
 
@@ -150,7 +151,8 @@ export function ScheduleFormModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
-      <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="저장 중..." />}
         <h2 className="mb-4 text-lg font-semibold text-black dark:text-zinc-50">
           {initial ? "일정 수정" : "새 일정 등록"}
         </h2>

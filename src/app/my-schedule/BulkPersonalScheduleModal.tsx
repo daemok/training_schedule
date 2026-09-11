@@ -8,6 +8,7 @@ import {
   nextMonthAnchor,
 } from "@/app/calendar/date-utils";
 import { formatDateOnly } from "@/lib/date";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { MAX_BULK_PERSONAL_DATES, type BulkConflictInfo, type BulkSubmitResult } from "@/lib/schedule-bulk";
 import type { PersonalBlockChoice } from "./personal-block";
 import { PERSONAL_BLOCK_LABEL } from "./personal-block";
@@ -120,7 +121,8 @@ export function BulkPersonalScheduleModal({ onCancel, onSubmit }: Props) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
-      <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative max-h-full w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="등록 중..." />}
         <h2 className="mb-1 text-lg font-semibold text-black dark:text-zinc-50">
           개인일정 일괄 등록
         </h2>

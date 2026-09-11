@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toDateOnly, formatDateOnly } from "@/lib/date";
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import {
   acquireRequestLockClient,
   releaseRequestLockClient,
@@ -178,7 +179,8 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-zinc-400">불러오는 중...</p>}
+      <div className="relative min-h-[64px]">
+      {loading && <LoadingOverlay />}
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
           {error}
@@ -246,6 +248,7 @@ export function ApplyFlow({ lectureTypes }: { lectureTypes: LectureType[] }) {
           </table>
         </div>
       )}
+      </div>
 
       {requestTarget && lectureTypeId && (
         <RequestFormModal

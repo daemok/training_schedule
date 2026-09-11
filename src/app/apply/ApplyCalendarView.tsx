@@ -10,6 +10,7 @@ import {
 } from "@/app/calendar/date-utils";
 import { RequestFormModal, RequestFormPayload, SubmitResult } from "./RequestFormModal";
 import { Toast } from "@/components/Toast";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import {
   acquireRequestLockClient,
   releaseRequestLockClient,
@@ -274,6 +275,8 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
         </div>
       </div>
 
+      <div className="relative min-h-[64px]">
+      {loading && <LoadingOverlay />}
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
           {error}
@@ -354,6 +357,7 @@ export function ApplyCalendarView({ lectureTypes }: Props) {
           </div>
         </div>
       )}
+      </div>
 
       {pickerTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">

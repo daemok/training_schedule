@@ -4,6 +4,7 @@ import { useState } from "react";
 import { InstructorFormModal, InstructorOption, BrandOption, SubmitResult } from "./InstructorFormModal";
 import { Toast } from "@/components/Toast";
 import { formatDateTimeKstLocal } from "@/lib/date";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface LectureBrand {
   id: number;
@@ -401,8 +402,9 @@ export function InstructorManager({
           return (
             <div
               key={instructor.id}
-              className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+              className="relative rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
             >
+              {savingInstructorId === instructor.id && <LoadingOverlay label="저장 중..." />}
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <span className="font-medium text-black dark:text-zinc-50">
@@ -500,7 +502,8 @@ export function InstructorManager({
             )
           )}
         </div>
-        <div className="flex items-end gap-2 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+        <div className="relative flex items-end gap-2 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+          {creatingBrand && <LoadingOverlay label="추가 중..." />}
           <div className="flex-1">
             <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
               새 브랜드 이름
@@ -542,8 +545,9 @@ export function InstructorManager({
             editingTypeId === t.id ? (
               <div
                 key={t.id}
-                className="flex flex-col gap-2 rounded-lg border border-black p-4 dark:border-zinc-50"
+                className="relative flex flex-col gap-2 rounded-lg border border-black p-4 dark:border-zinc-50"
               >
+                {savingTypeEdit && <LoadingOverlay label="저장 중..." />}
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="flex-1">
                     <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
@@ -649,7 +653,8 @@ export function InstructorManager({
           )}
         </div>
 
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+        <div className="relative flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
+          {creatingType && <LoadingOverlay label="개설 중..." />}
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
@@ -729,7 +734,8 @@ export function InstructorManager({
 
       {deleting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+          <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            {deleteSubmitting && <LoadingOverlay label="삭제 중..." />}
             <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
               강사를 삭제할까요?
             </h2>

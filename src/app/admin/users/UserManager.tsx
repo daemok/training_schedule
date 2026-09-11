@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Toast } from "@/components/Toast";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 type Role = "INSTRUCTOR" | "TEAM_LEAD" | "MANAGER" | "GENERAL";
 type Status = "PENDING" | "APPROVED" | "REJECTED";
@@ -337,7 +338,8 @@ export function UserManager({
 
       {editing && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+          <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            {editSubmitting && <LoadingOverlay label="저장 중..." />}
             <h2 className="mb-4 text-lg font-semibold text-black dark:text-zinc-50">
               계정 정보 수정
             </h2>
@@ -398,7 +400,8 @@ export function UserManager({
 
       {resetting && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+          <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            {resetSubmitting && <LoadingOverlay label="재설정 중..." />}
             {resetResult ? (
               <>
                 <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
@@ -478,7 +481,8 @@ export function UserManager({
 
       {deleting && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+          <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            {deleteSubmitting && <LoadingOverlay label="삭제 중..." />}
             <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
               계정을 삭제할까요?
             </h2>
@@ -514,7 +518,8 @@ export function UserManager({
 
       {createOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+          <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            {createSubmitting && <LoadingOverlay label="생성 중..." />}
             {createResult ? (
               <>
                 <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">

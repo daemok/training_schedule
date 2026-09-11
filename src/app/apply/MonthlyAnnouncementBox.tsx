@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 const MAX_LENGTH = 1000;
 
@@ -43,7 +44,8 @@ export function MonthlyAnnouncementBox({ initialContent, canManage }: Props) {
   }
 
   return (
-    <div className="flex h-fit flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800 lg:sticky lg:top-6">
+    <div className="relative flex h-fit flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800 lg:sticky lg:top-6">
+      {saving && <LoadingOverlay label="저장 중..." />}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
           이달의 교육 프로그램 안내

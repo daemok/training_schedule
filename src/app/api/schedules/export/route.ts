@@ -3,9 +3,15 @@ import ExcelJS from "exceljs";
 import { getSessionFromRequest } from "@/lib/auth/current-user";
 import { toDateOnly } from "@/lib/date";
 import { fetchMaskedSchedules } from "@/lib/schedule-query";
-import { TIME_BLOCK_LABEL, SCHEDULE_TYPE_LABEL } from "@/lib/schedule-labels";
+import { TIME_BLOCK_LABEL } from "@/lib/schedule-labels";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function formatDateHeader(dateStr: string): string {
+  const weekday = WEEKDAY_LABELS[new Date(`${dateStr}T00:00:00.000Z`).getUTCDay()];
+  return `${dateStr} (${weekday})`;
+}
 
 /**
  * GET /api/schedules/export?from=2026-07-01&to=2026-08-01&instructor=ALL
@@ -48,30 +54,32 @@ export async function GET(request: NextRequest) {
   workbook.creator = "강사 스케줄 관리";
   workbook.created = new Date();
 
+  // 캘린더 형태로 읽히도록, 표 대신 날짜별로 묶어 강의 1건당 2줄(강의명/FC·LOS/시간 →
+  // 장소/강사명)로 라벨을 셀에 그대로 표기한다.
   const sheet = workbook.addWorksheet("스케줄");
-  sheet.columns = [
-    { header: "날짜", key: "date", width: 12 },
-    { header: "시간블록", key: "timeBlock", width: 10 },
-    { header: "시작시각", key: "startTime", width: 10 },
-    { header: "종료시각", key: "endTime", width: 10 },
-    { header: "구분", key: "scheduleType", width: 10 },
-    { header: "강의명", key: "title", width: 32 },
-    { header: "강사명", key: "instructorName", width: 12 },
-    { header: "장소", key: "location", width: 24 },
-  ];
-  sheet.getRow(1).font = { bold: true };
+  sheet.columns = [{ width: 34 }, { width: 22 }, { width: 22 }];
 
+  let currentDate: string | null = null;
   for (const row of rows) {
-    sheet.addRow({
-      date: row.date,
-      timeBlock: TIME_BLOCK_LABEL[row.timeBlock],
-      startTime: row.startTime ?? "-",
-      endTime: row.endTime ?? "-",
-      scheduleType: SCHEDULE_TYPE_LABEL[row.scheduleType],
-      title: row.title,
-      instructorName: row.instructorName,
-      location: row.location ?? "",
-    });
+    if (row.date !== currentDate) {
+      currentDate = row.date;
+      const headerRow = sheet.addRow([`■ ${formatDateHeader(row.date)}`]);
+      headerRow.font = { bold: true };
+      sheet.mergeCells(headerRow.number, 1, headerRow.number, 3);
+    }
+
+    const timeLabel =
+      row.startTime && row.endTime
+        ? `${row.startTime}~${row.endTime}`
+        : `${TIME_BLOCK_LABEL[row.timeBlock]}(블록)`;
+
+    sheet.addRow([
+      `강의명: ${row.title}`,
+      `FC/LOS: ${row.lectureRequest?.fcLos ?? "-"}`,
+      `시간: ${timeLabel}`,
+    ]);
+    sheet.addRow([`장소: ${row.location ?? "-"}`, `강사명: ${row.instructorName}`]);
+    sheet.addRow([]);
   }
 
   const buffer = await workbook.xlsx.writeBuffer();

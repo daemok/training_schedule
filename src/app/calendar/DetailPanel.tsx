@@ -6,6 +6,7 @@ import {
   SCHEDULE_TYPE_LABEL,
 } from "./types";
 import { PERSONAL_TITLE_PLACEHOLDER } from "@/lib/access-control";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface Props {
   schedule: CalendarScheduleDTO;
@@ -38,9 +39,10 @@ export function DetailPanel({
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-sm overflow-y-auto bg-white p-6 shadow-xl dark:bg-zinc-900"
+        className="relative h-full w-full max-w-sm overflow-y-auto bg-white p-6 shadow-xl dark:bg-zinc-900"
         onClick={(e) => e.stopPropagation()}
       >
+        {decisionSubmitting && <LoadingOverlay label="처리 중..." />}
         <div className="mb-4 flex items-start justify-between">
           <div className="flex items-center gap-2">
             <span

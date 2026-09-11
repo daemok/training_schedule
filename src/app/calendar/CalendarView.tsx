@@ -29,6 +29,7 @@ import { ScheduleAdminFormModal, AdminScheduleFormPayload, SubmitResult } from "
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Toast } from "@/components/Toast";
 import { RejectReasonModal } from "@/components/RejectReasonModal";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { submitAllDayPersonalSchedule } from "@/lib/schedule-all-day";
 import { useKoreanHolidays } from "@/lib/korean-holidays";
 
@@ -374,6 +375,7 @@ export function CalendarView({
 
   return (
     <div className="flex flex-col gap-4">
+      {exporting && <LoadingOverlay fullscreen label="엑셀 파일을 생성하는 중..." />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
@@ -493,6 +495,8 @@ export function CalendarView({
         </p>
       )}
 
+      <div className="relative">
+      {loading && <LoadingOverlay />}
       {view === "month" && (
         <MonthGrid
           anchor={anchor}
@@ -528,6 +532,7 @@ export function CalendarView({
           onSelectEmpty={emptyClickEnabled ? openCreateAt : undefined}
         />
       )}
+      </div>
 
       {selected && (
         <DetailPanel

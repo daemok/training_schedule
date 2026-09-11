@@ -8,6 +8,7 @@ import {
   nextMonthAnchor,
 } from "@/app/calendar/date-utils";
 import { formatDateOnly } from "@/lib/date";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import type { BulkConflictInfo, BulkEditResult, BulkDeleteResult } from "@/lib/schedule-bulk";
 import type { ScheduleDTO, TimeBlock } from "./types";
 import { TIME_BLOCK_LABEL } from "./types";
@@ -161,7 +162,8 @@ export function BulkPersonalManageModal({ onCancel, onDeleteSubmit, onEditSubmit
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
-      <div className="max-h-full w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative max-h-full w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="처리 중..." />}
         <h2 className="mb-1 text-lg font-semibold text-black dark:text-zinc-50">
           개인일정 일괄 관리
         </h2>
@@ -190,14 +192,14 @@ export function BulkPersonalManageModal({ onCancel, onDeleteSubmit, onEditSubmit
           </button>
         </div>
 
-        {loading && <p className="mb-2 text-xs text-zinc-400">불러오는 중...</p>}
         {loadError && (
           <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             {loadError}
           </p>
         )}
 
-        <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div className="relative overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+          {loading && <LoadingOverlay />}
           <div className="grid grid-cols-7 border-b border-zinc-200 bg-zinc-50 text-center text-[11px] font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
             {WEEKDAY_HEADERS.map((w) => (
               <div key={w} className="py-1.5">

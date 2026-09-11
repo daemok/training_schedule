@@ -8,6 +8,23 @@ import { makeRequest } from "../helpers/request";
 
 let fx: Awaited<ReturnType<typeof resetDb>>;
 
+/**
+ * 엑셀 내보내기는 날짜별로 묶여 강의 1건당 2줄(1줄: "강의명: .../FC·LOS: .../시간: ...",
+ * 2줄: "장소: .../강사명: ...")로 라벨이 셀에 그대로 표기된다(고정 헤더 행이 없음) —
+ * src/app/api/schedules/export/route.ts. 각 블록의 첫 줄(1번 열)에서 "강의명: " 라벨을
+ * 떼어내 실제 제목만 모은다.
+ */
+function extractTitles(sheet: ExcelJS.Worksheet): string[] {
+  const titles: string[] = [];
+  sheet.eachRow((row) => {
+    const first = String(row.getCell(1).value ?? "");
+    if (first.startsWith("강의명: ")) {
+      titles.push(first.slice("강의명: ".length));
+    }
+  });
+  return titles;
+}
+
 const SECRET_REASON = "병원 진료 실제 사유(비공개)";
 const SECRET_MEMO = "정기 검진, 매우 민감한 개인 메모";
 
@@ -108,11 +125,7 @@ describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
     const sheet = workbook.getWorksheet("스케줄");
     expect(sheet).toBeDefined();
 
-    const titles: string[] = [];
-    sheet!.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // header row
-      titles.push(String(row.getCell(6).value ?? ""));
-    });
+    const titles = extractTitles(sheet!);
 
     expect(titles.some((t) => t.includes(SECRET_REASON))).toBe(true);
   });
@@ -129,11 +142,7 @@ describe("개인일정 사유 노출 정책 (엑셀 내보내기)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.getWorksheet("스케줄");
-    const titles: string[] = [];
-    sheet!.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-      titles.push(String(row.getCell(6).value ?? ""));
-    });
+    const titles = extractTitles(sheet!);
 
     expect(titles).toContain("개인 일정");
     expect(titles.some((t) => t.includes(SECRET_REASON))).toBe(false);

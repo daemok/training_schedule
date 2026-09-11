@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 export interface InstructorOption {
   id: number;
@@ -136,7 +137,8 @@ export function InstructorFormModal({ initial, brands, onCancel, onSubmit }: Pro
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="저장 중..." />}
         <h2 className="mb-4 text-lg font-semibold text-black dark:text-zinc-50">
           {initial ? "강사 정보 수정" : "새 강사 등록"}
         </h2>

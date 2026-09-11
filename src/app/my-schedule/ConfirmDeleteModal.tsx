@@ -1,6 +1,7 @@
 "use client";
 
 import { ScheduleDTO, TIME_BLOCK_LABEL, SCHEDULE_TYPE_LABEL } from "./types";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface Props {
   schedule: ScheduleDTO;
@@ -19,7 +20,8 @@ export function ConfirmDeleteModal({
 }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="삭제 중..." />}
         <h2 className="mb-2 text-lg font-semibold text-black dark:text-zinc-50">
           일정을 삭제할까요?
         </h2>

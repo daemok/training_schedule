@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { TIME_BLOCK_LABEL, TIME_BLOCK_RANGE, type TimeBlock } from "@/lib/schedule-labels";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 export interface RequestFormPayload {
   instructorId: number;
@@ -117,7 +118,8 @@ export function RequestFormModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8">
-      <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+      <div className="relative max-h-full w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        {submitting && <LoadingOverlay label="신청 처리 중..." />}
         <div className="mb-1 flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-black dark:text-zinc-50">강의 신청</h2>
           <span
