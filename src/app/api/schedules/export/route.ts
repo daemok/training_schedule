@@ -8,11 +8,12 @@ import { buildMonthGridDays, formatMonthTitle } from "@/app/calendar/date-utils"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAY_HEADERS = ["일", "월", "화", "수", "목", "금", "토"];
-
-interface RichTextRun {
-  text: string;
-  font?: Partial<ExcelJS.Font>;
-}
+const THIN_BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: "thin" },
+  bottom: { style: "thin" },
+  left: { style: "thin" },
+  right: { style: "thin" },
+};
 
 function timeLabelFor(row: MaskedScheduleRow): string {
   return row.startTime && row.endTime
@@ -25,10 +26,12 @@ function timeLabelFor(row: MaskedScheduleRow): string {
  *
  * 선택된 기간 + 선택된 강사(또는 전체) 기준으로, 확정된(CONFIRMED) 강의(LECTURE)만
  * 실제 달력처럼 보이는 엑셀(.xlsx)로 내려준다 — 개인일정과 미확정 건은 제외한다.
- * 월별로 한 시트씩, 요일 헤더 아래 주 단위 행마다 그 날짜의 모든 강의를 한 칸 안에
- * 강의 1건당 2줄(1줄: "FC/LOS {값} {시간}", 2줄: "{장소} / {강사명}")로 줄바꿈해 쌓는다
- * (강의 프로그램명/브랜드는 표시하지 않는다). /api/schedules와 동일한 조회+마스킹
- * (fetchMaskedSchedules)을 재사용한 뒤 이 라우트에서 CONFIRMED LECTURE만 걸러낸다.
+ * 월별로 한 시트씩, 요일 헤더 아래 주마다 먼저 날짜 숫자 행을 두고, 강의 1건당 실제
+ * 엑셀 셀 2개(위 칸: "FC/LOS {값} {시간}", 아래 칸: "{장소} / {강사명}")를 써서 쌓는다
+ * (강의 프로그램명/브랜드는 표시하지 않는다) — 한 주 안에서 강의가 가장 많은 요일 기준으로
+ * 슬롯(행 쌍) 수를 맞추고, 강의가 적은 요일은 남는 슬롯을 비워 둔다. /api/schedules와
+ * 동일한 조회+마스킹(fetchMaskedSchedules)을 재사용한 뒤 이 라우트에서 CONFIRMED
+ * LECTURE만 걸러낸다.
  */
 export async function GET(request: NextRequest) {
   const user = await getSessionFromRequest(request);
@@ -91,43 +94,52 @@ export async function GET(request: NextRequest) {
       cell.font = { bold: true, color: { argb: colNumber === 1 ? "FFFF0000" : "FF000000" } };
       cell.alignment = { horizontal: "center" };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
-      cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      cell.border = THIN_BORDER;
     });
 
     const monthDays = buildMonthGridDays(anchor);
     const currentMonth = anchor.getUTCMonth();
     for (let week = 0; week < 6; week++) {
       const weekDays = monthDays.slice(week * 7, week * 7 + 7);
-      const dataRow = sheet.addRow(new Array(7).fill(null));
+      const inMonthFlags = weekDays.map((d) => d.getUTCMonth() === currentMonth);
+      if (!inMonthFlags.some(Boolean)) continue; // 이전/다음 달로만 이뤄진 주는 통째로 생략.
+
+      // 강의 1건당 실제 셀 2개(1칸: FC/LOS+시간, 아래칸: 장소/강사명)를 쓰므로, 그 주에서
+      // 강의가 가장 많은 요일 기준으로 필요한 줄 수(슬롯)를 맞춘다 — 강의가 적은 요일은
+      // 남는 슬롯이 비어 있을 뿐 grid 구조 자체는 요일마다 동일하게 유지된다.
+      const weekEntries = weekDays.map((day, i) =>
+        inMonthFlags[i] ? rowsByDate.get(formatDateOnly(day)) ?? [] : []
+      );
+      const maxEntries = Math.max(0, ...weekEntries.map((e) => e.length));
+
+      const dateRow = sheet.addRow(new Array(7).fill(null));
       weekDays.forEach((day, colIndex) => {
-        const cell = dataRow.getCell(colIndex + 1);
-        cell.alignment = { wrapText: true, vertical: "top", horizontal: "left" };
-        cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-
-        const inMonth = day.getUTCMonth() === currentMonth;
-        if (!inMonth) return; // 이전/다음 달로 넘어가는 칸은 비워둔다(날짜 숫자도 표시 안 함).
-
-        const dateStr = formatDateOnly(day);
-        const runs: RichTextRun[] = [
-          {
-            text: `${day.getUTCDate()}\n`,
-            font: { bold: true, size: 11, color: { argb: colIndex === 0 ? "FFFF0000" : "FF000000" } },
-          },
-        ];
-
-        for (const row of rowsByDate.get(dateStr) ?? []) {
-          runs.push({
-            text: `FC/LOS ${row.lectureRequest?.fcLos ?? "-"} ${timeLabelFor(row)}\n`,
-            font: { bold: true, size: 9 },
-          });
-          runs.push({
-            text: `${row.location ?? "-"} / ${row.instructorName}\n\n`,
-            font: { size: 9, color: { argb: "FF666666" } },
-          });
-        }
-
-        cell.value = { richText: runs };
+        const cell = dateRow.getCell(colIndex + 1);
+        cell.border = THIN_BORDER;
+        if (!inMonthFlags[colIndex]) return;
+        cell.value = day.getUTCDate();
+        cell.font = { bold: true, size: 11, color: { argb: colIndex === 0 ? "FFFF0000" : "FF000000" } };
       });
+
+      for (let slot = 0; slot < maxEntries; slot++) {
+        const fcLosRow = sheet.addRow(new Array(7).fill(null));
+        const locationRow = sheet.addRow(new Array(7).fill(null));
+        weekEntries.forEach((entries, colIndex) => {
+          const fcLosCell = fcLosRow.getCell(colIndex + 1);
+          const locationCell = locationRow.getCell(colIndex + 1);
+          fcLosCell.border = THIN_BORDER;
+          locationCell.border = THIN_BORDER;
+          fcLosCell.alignment = { wrapText: true };
+          locationCell.alignment = { wrapText: true };
+
+          const entry = entries[slot];
+          if (!entry) return;
+          fcLosCell.value = `FC/LOS ${entry.lectureRequest?.fcLos ?? "-"} ${timeLabelFor(entry)}`;
+          fcLosCell.font = { bold: true, size: 9 };
+          locationCell.value = `${entry.location ?? "-"} / ${entry.instructorName}`;
+          locationCell.font = { size: 9, color: { argb: "FF666666" } };
+        });
+      }
     }
   }
 
